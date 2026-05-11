@@ -1,0 +1,5 @@
+# HostPanel WireGuard - sudoers rules are inherited from main hostpanel sudoers
+# /usr/bin/systemctl covers wg-quick@wg0 service management
+# /usr/bin/cp and /usr/bin/chmod cover config file writes
+# /usr/bin/cat covers reading /etc/wireguard/wg0.conf
+# No additional rules needed beyond what install.sh already sets up
