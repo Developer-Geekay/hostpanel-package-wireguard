@@ -11,6 +11,7 @@ zip -r "$OUT" \
     hostpanel_wireguard/ \
     setup.py \
     conf/ \
+    frontend/ \
     --exclude "**/__pycache__/*" --exclude "**/*.pyc"
 
 echo "Done → ${OUT}"
