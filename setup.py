@@ -4,8 +4,20 @@ setup(
     name="hostpanel-wireguard",
     version="1.1.0",
     packages=find_packages(),
+    package_data={"hostpanel_wireguard": ["*.service"]},
     install_requires=["fastapi", "pydantic", "qrcode[pil]"],
     entry_points={
-        "hostpanel.modules": ["wireguard = hostpanel_wireguard.plugin"],
+        "hostpanel.modules": [
+            "wireguard = hostpanel_wireguard.plugin"
+        ],
+        "hostpanel.lifecycle": [
+            "hostpanel-wireguard = hostpanel_wireguard.lifecycle:pre_uninstall"
+        ],
+        "hostpanel.setup": [
+            "hostpanel-wireguard = hostpanel_wireguard.lifecycle:on_install"
+        ],
+        "hostpanel.hooks.on_startup": [
+            "hostpanel-wireguard = hostpanel_wireguard.lifecycle:on_startup"
+        ],
     },
 )

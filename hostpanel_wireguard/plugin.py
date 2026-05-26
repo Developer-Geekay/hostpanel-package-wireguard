@@ -23,7 +23,7 @@ PLUGIN_MANIFEST = {
     "admin_only": True,
     "service": {
         "name": "wireguard",
-        "unit": "wg-quick@wg0",
+        "unit": "hostpanel-wireguard",
         "label": "WireGuard VPN",
         "icon": "vpn_lock",
         "can_reload": False,
@@ -32,10 +32,10 @@ PLUGIN_MANIFEST = {
 
 router = APIRouter(prefix="/cpanelapi/wireguard", tags=["WireGuard"])
 
-WG_CONF = "/etc/wireguard/wg0.conf"
-PEERS_DIR = "/etc/wireguard/peers"
-PEERS_META = "/opt/hostpanel/wireguard/peers.json"
-WG_BIN = "/usr/bin/wg"
+WG_CONF    = "/etc/wireguard/wg0.conf"
+PEERS_DIR  = "/etc/wireguard/peers"
+PEERS_META = "/opt/hostpanel/plugins/wireguard/peers.json"
+WG_BIN     = "/opt/hostpanel/plugins/wireguard/wg"
 
 
 class PeerInfo(BaseModel):
