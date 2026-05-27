@@ -1,223 +1,77 @@
 /**
- * WireGuard Plugin – UI building blocks
+ * WireGuard Plugin – frontend
  *
- * Each section of the UI is a named factory function that returns a DOM node.
- * Blocks compose each other; nothing is hidden inside an anonymous wrapper.
- *
- * Registered on window.__hpkg['wireguard'] for PackageShell to call.
+ * Styling contract:
+ *   - ALL colors, fonts, radii, transitions come from the host app's CSS tokens
+ *     (var(--bg), var(--accent), var(--border), var(--font-ui), etc.)
+ *   - Interactive elements use host CSS classes: .btn, .card, .modal-overlay,
+ *     .modal, .toast, .dot-ok, .empty, input[type="text"] …
+ *   - This file only defines plugin-specific LAYOUT CSS (peer row grid, info
+ *     grid, QR sheet), and those rules also use only var(--xxx) tokens.
+ *   - No hardcoded colors, no imported fonts, no duplicate animations.
  */
 
 const WgPlugin = (() => {
   'use strict';
 
-  // ── Constants ──────────────────────────────────────────────────────────────
-  const STYLE_ID = 'wg-pkg-styles';
+  const STYLE_ID = 'wg-plugin-styles';
 
-  // ── CSS ────────────────────────────────────────────────────────────────────
-  const CSS = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
-    .wg-root {
-      --teal: #00e5cc;
-      --teal-dim: rgba(0,229,204,0.12);
-      --teal-glow: 0 0 24px rgba(0,229,204,0.25);
-      --bg: #070b0d;
-      --surface: #0d1517;
-      --surface2: #131c1f;
-      --border: rgba(0,229,204,0.1);
-      --border-hover: rgba(0,229,204,0.22);
-      --text: #ccd9dc;
-      --text-dim: #5e7e86;
-      --green: #2ed573;
-      --red: #ff4f5e;
-      --font: 'Outfit', sans-serif;
-      --mono: 'JetBrains Mono', monospace;
-
-      font-family: var(--font);
-      color: var(--text);
-      background: var(--bg);
-      min-height: 100%;
-      padding: 28px 24px;
-      box-sizing: border-box;
-      position: relative;
-      overflow-x: hidden;
-    }
-
-    .wg-root::before {
-      content: '';
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background-image: radial-gradient(circle, rgba(0,229,204,0.055) 1px, transparent 1px);
-      background-size: 30px 30px;
-    }
-
-    .wg-inner { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; }
-
-    /* ─── Header ─── */
-    .wg-header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
-    .wg-header-icon {
-      width: 46px; height: 46px; border-radius: 13px;
-      background: var(--teal-dim); border: 1px solid rgba(0,229,204,0.2);
-      display: grid; place-items: center; font-size: 24px;
-      box-shadow: var(--teal-glow);
-    }
-    .wg-title { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; color: #e8f2f4; }
-    .wg-subtitle { font-size: 11px; color: var(--text-dim); font-family: var(--mono); margin-top: 3px; }
-
-    /* ─── Cards ─── */
-    .wg-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 20px 24px; margin-bottom: 20px;
-      transition: border-color 0.2s;
-    }
-    .wg-card:hover { border-color: var(--border-hover); }
-    .wg-card-label {
-      font-size: 10px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.1em; color: var(--teal); margin-bottom: 16px;
-    }
-
-    /* ─── Server Info ─── */
-    .wg-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(176px,1fr)); gap: 16px; }
-    .wg-info-item { display: flex; flex-direction: column; gap: 5px; }
-    .wg-info-key { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); }
-    .wg-info-val { font-family: var(--mono); font-size: 12.5px; word-break: break-all; color: var(--text); }
-
-    /* ─── Peers ─── */
-    .wg-peers-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .wg-peers-title { font-size: 13px; font-weight: 500; color: #e8f2f4; }
-
-    .wg-peer-list { display: flex; flex-direction: column; gap: 8px; }
+  // ── Plugin-specific layout CSS (tokens only, no hardcoded values) ──────────
+  const LAYOUT_CSS = `
+    /* Peer list */
+    .wg-peer-list { display: flex; flex-direction: column; gap: 6px; }
     .wg-peer-row {
-      display: grid; grid-template-columns: 10px 1fr auto;
-      align-items: center; gap: 14px;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 10px; padding: 13px 16px;
-      transition: border-color 0.15s;
+      display: grid; grid-template-columns: 8px 1fr auto;
+      align-items: center; gap: 12px;
+      background: var(--bg-3); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 16px;
+      transition: border-color var(--transition);
     }
-    .wg-peer-row:hover { border-color: var(--border-hover); }
+    .wg-peer-row:hover { border-color: var(--accent-border); }
+    .wg-peer-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+    .wg-peer-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; font-family: var(--font-mono); color: var(--text-2); }
+    .wg-peer-ip   { color: var(--accent); }
+    .wg-peer-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
-    .wg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
-    .wg-dot-on { background: var(--green); box-shadow: 0 0 7px var(--green); }
-    .wg-dot-off { background: #2a3f44; }
+    /* Server info grid */
+    .wg-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+    .wg-info-key  { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 3px; }
+    .wg-info-val  { font-family: var(--font-mono); font-size: 12px; word-break: break-all; color: var(--text); }
 
-    .wg-peer-name { font-size: 13.5px; font-weight: 500; color: #e0ecee; margin-bottom: 5px; }
-    .wg-peer-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; font-family: var(--mono); color: var(--text-dim); }
-    .wg-peer-ip { color: var(--teal); }
-
-    .wg-peer-actions { display: flex; gap: 7px; flex-shrink: 0; }
-
-    .wg-empty { padding: 36px 0; text-align: center; color: var(--text-dim); font-size: 13px; }
-    .wg-empty-icon { font-size: 28px; margin-bottom: 10px; }
-
-    /* ─── Buttons ─── */
-    .wg-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 9px 18px; border-radius: 8px; border: none;
-      cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 500;
-      transition: all 0.15s; white-space: nowrap;
+    /* QR / Config sheet */
+    .wg-tab-row { display: flex; gap: 6px; margin-bottom: 14px; }
+    .wg-tab {
+      padding: 5px 12px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: transparent;
+      color: var(--text-2); font-family: var(--font-ui); font-size: 12px;
+      cursor: pointer; transition: all var(--transition);
     }
-    .wg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .wg-btn-primary { background: var(--teal); color: #050b0d; }
-    .wg-btn-primary:not(:disabled):hover { filter: brightness(1.1); box-shadow: var(--teal-glow); }
-    .wg-btn-ghost {
-      background: var(--teal-dim); color: var(--teal);
-      border: 1px solid rgba(0,229,204,0.18);
+    .wg-tab-active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border); }
+    .wg-qr-img { display: block; margin: 0 auto; max-width: 200px; width: 100%; border-radius: var(--radius-sm); image-rendering: pixelated; }
+    .wg-conf-pre {
+      font-family: var(--font-mono); font-size: 11px; color: var(--text-2);
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px; white-space: pre; overflow-x: auto; max-height: 200px; overflow-y: auto;
     }
-    .wg-btn-ghost:not(:disabled):hover { background: rgba(0,229,204,0.2); }
-    .wg-btn-danger {
-      background: rgba(255,79,94,0.12); color: var(--red);
-      border: 1px solid rgba(255,79,94,0.18);
-    }
-    .wg-btn-danger:not(:disabled):hover { background: rgba(255,79,94,0.22); }
-    .wg-btn-sm { padding: 5px 12px; font-size: 11.5px; border-radius: 6px; }
-    .wg-btn-icon { padding: 5px 10px; font-size: 13px; border-radius: 6px; min-width: 32px; justify-content: center; }
+    .wg-dl-row { display: flex; justify-content: flex-end; margin-top: 10px; }
 
-    /* ─── Skeleton ─── */
+    /* Skeleton — uses host @keyframes spin defined in globals.css */
     .wg-skel {
-      background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+      background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
       background-size: 200% 100%; animation: wg-shimmer 1.5s infinite;
-      border-radius: 5px; height: 13px;
+      border-radius: var(--radius-sm); height: 12px;
     }
     @keyframes wg-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-    /* ─── Overlay + Modal ─── */
-    .wg-overlay {
-      position: fixed; inset: 0; z-index: 800;
-      background: rgba(3,7,9,0.82); backdrop-filter: blur(5px);
-      display: flex; align-items: center; justify-content: center; padding: 24px;
-    }
-    .wg-modal {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 16px; padding: 28px 30px;
-      width: 360px; max-width: 100%;
-      box-shadow: 0 28px 70px rgba(0,0,0,0.55), var(--teal-glow);
-    }
-    .wg-modal-title { font-size: 15px; font-weight: 600; color: #e8f2f4; margin-bottom: 22px; }
-    .wg-modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
-
-    .wg-field { margin-bottom: 16px; }
-    .wg-field-label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 7px; }
-    .wg-input {
-      width: 100%; box-sizing: border-box;
-      background: var(--bg); color: var(--text);
-      border: 1px solid var(--border); border-radius: 8px;
-      padding: 10px 13px; font-family: var(--font); font-size: 13.5px;
-      outline: none; transition: border-color 0.2s;
-    }
-    .wg-input:focus { border-color: var(--teal); }
-    .wg-input::placeholder { color: #2a3f44; }
-
-    /* ─── QR Sheet ─── */
-    .wg-qr-sheet {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 16px; padding: 28px 30px;
-      width: 420px; max-width: 100%;
-      box-shadow: 0 28px 70px rgba(0,0,0,0.55);
-    }
-    .wg-qr-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-    .wg-qr-title { font-size: 15px; font-weight: 600; color: #e8f2f4; }
-    .wg-close-btn {
-      background: none; border: none; cursor: pointer;
-      color: var(--text-dim); font-size: 18px; padding: 2px 6px;
-      border-radius: 6px; transition: color 0.15s;
-    }
-    .wg-close-btn:hover { color: var(--text); }
-    .wg-tab-row { display: flex; gap: 8px; margin-bottom: 16px; }
-    .wg-tab {
-      padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
-      background: transparent; color: var(--text-dim); font-family: var(--font);
-      font-size: 11.5px; cursor: pointer; transition: all 0.15s;
-    }
-    .wg-tab-active { background: var(--teal-dim); color: var(--teal); border-color: rgba(0,229,204,0.25); }
-    .wg-qr-img { display: block; margin: 0 auto; max-width: 220px; width: 100%; border-radius: 6px; image-rendering: pixelated; }
-    .wg-conf-code {
-      font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 8px; padding: 12px 14px;
-      white-space: pre; overflow-x: auto;
-      max-height: 220px; overflow-y: auto;
-    }
-    .wg-dl-row { display: flex; justify-content: flex-end; margin-top: 12px; }
-
-    /* ─── Toast ─── */
-    .wg-toast {
-      position: fixed; bottom: 24px; right: 24px; z-index: 9000;
-      display: flex; align-items: center; gap: 9px;
-      padding: 11px 17px; border-radius: 10px; font-size: 12.5px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.4);
-      transition: opacity 0.3s, transform 0.3s;
-      max-width: 300px; pointer-events: none;
-    }
-    .wg-toast-ok  { background: rgba(46,213,115,0.14); border: 1px solid rgba(46,213,115,0.28); color: var(--green); }
-    .wg-toast-err { background: rgba(255,79,94,0.14);  border: 1px solid rgba(255,79,94,0.28);  color: var(--red); }
-    .wg-toast-gone { opacity: 0; transform: translateY(10px); }
-
-    /* ─── Spinner ─── */
+    /* Button-inline spinner (uses host @keyframes spin) */
     .wg-spin {
       display: inline-block; width: 13px; height: 13px;
-      border: 2px solid rgba(0,229,204,0.2); border-top-color: var(--teal);
-      border-radius: 50%; animation: wg-spin 0.65s linear infinite;
+      border: 2px solid var(--border); border-top-color: currentColor;
+      border-radius: 50%; animation: spin 0.65s linear infinite;
     }
-    @keyframes wg-spin { to { transform: rotate(360deg); } }
+
+    /* Peers header row */
+    .wg-peers-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   `;
 
   // ── Primitives ─────────────────────────────────────────────────────────────
@@ -233,7 +87,7 @@ const WgPlugin = (() => {
     if (document.getElementById(STYLE_ID)) return;
     const s = document.createElement('style');
     s.id = STYLE_ID;
-    s.textContent = CSS;
+    s.textContent = LAYOUT_CSS;
     document.head.appendChild(s);
   }
 
@@ -260,53 +114,65 @@ const WgPlugin = (() => {
   }
 
   // ── Building Block: Toast ──────────────────────────────────────────────────
-  // Self-mounted; no return value needed.
+  // Uses .toast .toast-ok / .toast-err from host components.css.
+  // Mounts into a shared fixed container so multiple toasts stack correctly.
+
+  let toastContainer = null;
 
   function Toast(msg, ok = true) {
-    const t = el('div', 'wg-toast ' + (ok ? 'wg-toast-ok' : 'wg-toast-err'));
-    t.append(el('span', null, ok ? '✓' : '✕'), el('span', null, msg));
-    document.body.appendChild(t);
-    setTimeout(() => {
-      t.classList.add('wg-toast-gone');
-      setTimeout(() => t.remove(), 350);
-    }, 3200);
+    if (!toastContainer) {
+      toastContainer = el('div');
+      Object.assign(toastContainer.style, {
+        position: 'fixed', bottom: '24px', right: '24px',
+        zIndex: '9000', display: 'flex', flexDirection: 'column', gap: '8px',
+      });
+      document.body.appendChild(toastContainer);
+    }
+
+    const t = el('div', 'toast ' + (ok ? 'toast-ok' : 'toast-err'));
+    t.append(el('span', 'toast-icon', ok ? '✓' : '✕'), el('span', 'toast-msg', msg));
+    toastContainer.appendChild(t);
+
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; }, 3400);
+    setTimeout(() => t.remove(), 3700);
   }
 
   // ── Building Block: Header ─────────────────────────────────────────────────
+  // Uses .page-header, .page-title, .page-desc from host globals.css.
 
   function Header() {
-    const header = el('div', 'wg-header');
-    const icon   = el('div', 'wg-header-icon', '🔒');
-    const text   = el('div');
-    text.append(
-      el('div', 'wg-title', 'WireGuard VPN'),
-      el('div', 'wg-subtitle', 'Peer management & key distribution')
+    const header = el('div', 'page-header');
+    const left   = el('div');
+    left.append(
+      el('div', 'page-title', 'WireGuard VPN'),
+      el('div', 'page-desc',  'Peer management & key distribution'),
     );
-    header.append(icon, text);
+    header.appendChild(left);
     return header;
   }
 
   // ── Building Block: PeerRow ────────────────────────────────────────────────
+  // Uses .dot .dot-ok / .dot-dim from host globals.css.
+  // Uses .btn .btn-ghost .btn-danger .btn-sm from host components.css.
 
   function PeerRow(peer, { onQr, onDelete }) {
     const row  = el('div', 'wg-peer-row');
-    const dot  = el('div', 'wg-dot ' + (isOnline(peer) ? 'wg-dot-on' : 'wg-dot-off'));
+    const dot  = el('div', 'dot ' + (isOnline(peer) ? 'dot-ok' : 'dot-dim'));
 
-    const info = el('div', 'wg-peer-info');
+    const info = el('div');
     const name = el('div', 'wg-peer-name', peer.name);
     const meta = el('div', 'wg-peer-meta');
-    const ip   = el('span', 'wg-peer-ip', peer.allowed_ips);
     meta.append(
-      ip,
+      el('span', 'wg-peer-ip', peer.allowed_ips),
       el('span', null, formatHandshake(peer.last_handshake)),
       el('span', null, '↓ ' + formatBytes(peer.transfer_rx)),
-      el('span', null, '↑ ' + formatBytes(peer.transfer_tx))
+      el('span', null, '↑ ' + formatBytes(peer.transfer_tx)),
     );
     info.append(name, meta);
 
     const actions = el('div', 'wg-peer-actions');
-    const qrBtn   = el('button', 'wg-btn wg-btn-ghost wg-btn-sm wg-btn-icon', '◫ QR');
-    const delBtn  = el('button', 'wg-btn wg-btn-danger wg-btn-sm', 'Remove');
+    const qrBtn   = el('button', 'btn btn-ghost btn-sm', 'QR');
+    const delBtn  = el('button', 'btn btn-danger btn-sm', 'Remove');
     qrBtn.addEventListener('click', () => onQr(peer.name));
     delBtn.addEventListener('click', () => onDelete(peer.name));
     actions.append(qrBtn, delBtn);
@@ -316,36 +182,50 @@ const WgPlugin = (() => {
   }
 
   // ── Building Block: AddModal ───────────────────────────────────────────────
+  // Uses .modal-overlay .modal .modal-header .modal-title .modal-close
+  //      .modal-body .modal-footer from host components.css.
+  // Uses host input[type="text"] global styles — no custom .wg-input needed.
 
   function AddModal(api, { onSuccess }) {
-    const overlay = el('div', 'wg-overlay');
-    const modal   = el('div', 'wg-modal');
+    const overlay = el('div', 'modal-overlay');
+    const modal   = el('div', 'modal animate-fade-in');
+    modal.style.width = '380px';
 
-    const nameField  = el('div', 'wg-field');
-    const nameLabel  = el('label', 'wg-field-label', 'Peer name');
-    const nameInput  = el('input', 'wg-input');
-    nameInput.placeholder = 'e.g. laptop, phone-ios';
-    nameInput.type = 'text';
+    // Header
+    const header    = el('div', 'modal-header');
+    const closeBtn  = el('button', 'modal-close', '✕');
+    header.append(el('span', 'modal-title', 'Add Peer'), closeBtn);
+
+    // Body
+    const body = el('div', 'modal-body');
+
+    const nameField  = el('div', 'field');
+    const nameLabel  = el('label', null, 'Peer name');
+    const nameInput  = document.createElement('input');
+    nameInput.type = 'text'; nameInput.placeholder = 'e.g. laptop, phone-ios';
     nameField.append(nameLabel, nameInput);
 
-    const ipField  = el('div', 'wg-field');
-    const ipLabel  = el('label', 'wg-field-label', 'Allowed IPs (optional — auto-assigned if blank)');
-    const ipInput  = el('input', 'wg-input');
-    ipInput.placeholder = '10.66.66.x/32';
-    ipInput.type = 'text';
+    const ipField  = el('div', 'field');
+    const ipLabel  = el('label', null, 'Allowed IPs (optional — auto-assigned if blank)');
+    const ipInput  = document.createElement('input');
+    ipInput.type = 'text'; ipInput.placeholder = '10.66.66.x/32';
     ipField.append(ipLabel, ipInput);
 
-    const footer    = el('div', 'wg-modal-footer');
-    const cancelBtn = el('button', 'wg-btn wg-btn-ghost', 'Cancel');
-    const addBtn    = el('button', 'wg-btn wg-btn-primary', 'Add Peer');
+    body.append(nameField, ipField);
+
+    // Footer
+    const footer    = el('div', 'modal-footer');
+    const cancelBtn = el('button', 'btn btn-outline btn-md', 'Cancel');
+    const addBtn    = el('button', 'btn btn-primary btn-md', 'Add Peer');
     footer.append(cancelBtn, addBtn);
 
-    modal.append(el('div', 'wg-modal-title', 'Add Peer'), nameField, ipField, footer);
+    modal.append(header, body, footer);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
     nameInput.focus();
 
     const close = () => overlay.remove();
+    closeBtn.addEventListener('click', close);
     cancelBtn.addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
@@ -354,7 +234,7 @@ const WgPlugin = (() => {
       if (!name) { nameInput.focus(); return; }
       addBtn.disabled = true;
       addBtn.innerHTML = '';
-      addBtn.appendChild(el('span', 'wg-spin'));
+      addBtn.append(el('span', 'wg-spin'), document.createTextNode(' Adding…'));
       try {
         const body = { name };
         const ip = ipInput.value.trim();
@@ -377,33 +257,42 @@ const WgPlugin = (() => {
   // ── Building Block: DeleteModal ────────────────────────────────────────────
 
   function DeleteModal(name, api, { onSuccess }) {
-    const overlay = el('div', 'wg-overlay');
-    const modal   = el('div', 'wg-modal');
+    const overlay = el('div', 'modal-overlay');
+    const modal   = el('div', 'modal animate-fade-in');
+    modal.style.width = '360px';
 
-    const msg = el('p', 'wg-confirm-msg');
+    const header   = el('div', 'modal-header');
+    const closeBtn = el('button', 'modal-close', '✕');
+    header.append(el('span', 'modal-title', 'Remove Peer'), closeBtn);
+
+    const body = el('div', 'modal-body');
+    const msg  = el('p');
+    msg.style.color = 'var(--text-2)';
     msg.append(
       document.createTextNode('Remove peer '),
       el('strong', null, name),
-      document.createTextNode('? This will revoke VPN access.')
+      document.createTextNode('? This will revoke VPN access.'),
     );
+    body.appendChild(msg);
 
-    const footer    = el('div', 'wg-modal-footer');
-    const cancelBtn = el('button', 'wg-btn wg-btn-ghost', 'Cancel');
-    const delBtn    = el('button', 'wg-btn wg-btn-danger', 'Remove');
+    const footer    = el('div', 'modal-footer');
+    const cancelBtn = el('button', 'btn btn-outline btn-md', 'Cancel');
+    const delBtn    = el('button', 'btn btn-danger btn-md', 'Remove');
     footer.append(cancelBtn, delBtn);
 
-    modal.append(el('div', 'wg-modal-title', 'Remove Peer'), msg, footer);
+    modal.append(header, body, footer);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
     const close = () => overlay.remove();
+    closeBtn.addEventListener('click', close);
     cancelBtn.addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
     delBtn.addEventListener('click', async () => {
       delBtn.disabled = true;
       delBtn.innerHTML = '';
-      delBtn.appendChild(el('span', 'wg-spin'));
+      delBtn.append(el('span', 'wg-spin'), document.createTextNode(' Removing…'));
       try {
         await api.delete('peers/' + encodeURIComponent(name));
         Toast('Peer "' + name + '" removed');
@@ -420,37 +309,45 @@ const WgPlugin = (() => {
   // ── Building Block: QRSheet ────────────────────────────────────────────────
 
   async function QRSheet(name, api) {
-    const overlay = el('div', 'wg-overlay');
-    const sheet   = el('div', 'wg-qr-sheet');
+    const overlay = el('div', 'modal-overlay');
+    const modal   = el('div', 'modal animate-fade-in');
+    modal.style.width = '400px';
 
-    const head      = el('div', 'wg-qr-head');
-    const closeBtn  = el('button', 'wg-close-btn', '×');
-    closeBtn.setAttribute('aria-label', 'Close');
-    head.append(el('div', 'wg-qr-title', name), closeBtn);
+    const header   = el('div', 'modal-header');
+    const closeBtn = el('button', 'modal-close', '✕');
+    header.append(el('span', 'modal-title', name + ' — Config'), closeBtn);
 
+    const body = el('div', 'modal-body');
+
+    // Tab switcher (plugin-specific, uses wg-tab which reads var(--xxx) tokens)
     const tabRow  = el('div', 'wg-tab-row');
     const qrTab   = el('button', 'wg-tab wg-tab-active', 'QR Code');
     const confTab = el('button', 'wg-tab', 'Config File');
     tabRow.append(qrTab, confTab);
 
-    const content = el('div', 'wg-qr-content');
+    const content = el('div');
     const spinner = el('div', 'wg-spin');
     spinner.style.cssText = 'margin: 40px auto; display: block;';
     content.appendChild(spinner);
 
     const dlRow = el('div', 'wg-dl-row');
 
-    sheet.append(head, tabRow, content, dlRow);
-    overlay.appendChild(sheet);
+    body.append(tabRow, content, dlRow);
+
+    const footer = el('div', 'modal-footer');
+    footer.appendChild(el('span')); // spacer
+
+    modal.append(header, body);
+    overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
     const close = () => overlay.remove();
     closeBtn.addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
+    // Fetch data
     let configText = '';
     let qrObjectUrl = null;
-
     try {
       const [confRes, qrRes] = await Promise.all([
         api.raw('GET', 'peers/' + encodeURIComponent(name) + '/config'),
@@ -458,48 +355,41 @@ const WgPlugin = (() => {
       ]);
       if (confRes.ok) { const d = await confRes.json(); configText = d.config || ''; }
       if (qrRes.ok)   { qrObjectUrl = URL.createObjectURL(await qrRes.blob()); }
-    } catch {
-      Toast('Could not load peer config', false);
-    }
+    } catch { Toast('Could not load peer config', false); }
 
     const renderQr = () => {
-      content.innerHTML = '';
-      dlRow.innerHTML   = '';
+      content.innerHTML = ''; dlRow.innerHTML = '';
       if (qrObjectUrl) {
         const img = el('img', 'wg-qr-img');
-        img.src = qrObjectUrl;
-        img.alt = 'WireGuard QR code for ' + name;
+        img.src = qrObjectUrl; img.alt = 'QR for ' + name;
         content.appendChild(img);
-        const dl = el('a', 'wg-btn wg-btn-ghost wg-btn-sm', 'Download PNG');
+        const dl = el('a', 'btn btn-ghost btn-sm', 'Download PNG');
         dl.href = qrObjectUrl; dl.download = name + '.png';
         dlRow.appendChild(dl);
       } else {
-        content.appendChild(el('p', null, 'QR code unavailable (qrcode library not installed)'));
+        content.appendChild(el('p', null, 'QR unavailable (qrcode library not installed on server)'));
       }
     };
 
     const renderConf = () => {
-      content.innerHTML = '';
-      dlRow.innerHTML   = '';
-      const pre = el('pre', 'wg-conf-code');
+      content.innerHTML = ''; dlRow.innerHTML = '';
+      const pre = el('pre', 'wg-conf-pre');
       pre.textContent = configText || '# Config not available';
       content.appendChild(pre);
       if (configText) {
         const blob = new Blob([configText], { type: 'text/plain' });
-        const dl   = el('a', 'wg-btn wg-btn-ghost wg-btn-sm', 'Download .conf');
+        const dl   = el('a', 'btn btn-ghost btn-sm', 'Download .conf');
         dl.href = URL.createObjectURL(blob); dl.download = name + '.conf';
         dlRow.appendChild(dl);
       }
     };
 
     qrTab.addEventListener('click', () => {
-      qrTab.classList.add('wg-tab-active');
-      confTab.classList.remove('wg-tab-active');
+      qrTab.classList.add('wg-tab-active');    confTab.classList.remove('wg-tab-active');
       renderQr();
     });
     confTab.addEventListener('click', () => {
-      confTab.classList.add('wg-tab-active');
-      qrTab.classList.remove('wg-tab-active');
+      confTab.classList.add('wg-tab-active');  qrTab.classList.remove('wg-tab-active');
       renderConf();
     });
 
@@ -507,12 +397,13 @@ const WgPlugin = (() => {
   }
 
   // ── Building Block: ServerCard ─────────────────────────────────────────────
+  // Uses .card .card-title from host globals.css.
 
   function ServerCard(api) {
-    const card  = el('div', 'wg-card');
-    const label = el('div', 'wg-card-label', 'Server');
-    const grid  = el('div', 'wg-info-grid');
+    const card = el('div', 'card');
+    card.appendChild(el('div', 'card-title', 'Server'));
 
+    const grid   = el('div', 'wg-info-grid');
     const fields = [
       { key: 'endpoint',   label: 'Endpoint' },
       { key: 'address',    label: 'Interface IP' },
@@ -522,16 +413,15 @@ const WgPlugin = (() => {
 
     const valueEls = {};
     for (const f of fields) {
-      const item = el('div', 'wg-info-item');
+      const item = el('div');
       item.appendChild(el('div', 'wg-info-key', f.label));
       const val = el('div', 'wg-skel');
-      val.style.width = f.key === 'public_key' ? '90%' : '60%';
+      val.style.width = f.key === 'public_key' ? '90%' : '55%';
       item.appendChild(val);
       valueEls[f.key] = val;
       grid.appendChild(item);
     }
-
-    card.append(label, grid);
+    card.appendChild(grid);
 
     api.get('server/info').then(info => {
       for (const f of fields) {
@@ -549,21 +439,28 @@ const WgPlugin = (() => {
   }
 
   // ── Building Block: PeerList ───────────────────────────────────────────────
+  // Uses .card .card-title .empty .empty-title .empty-desc from host.
+  // Uses .btn .btn-primary .btn-md for the Add Peer button.
 
   function PeerList(api) {
-    const card    = el('div', 'wg-card');
+    const card    = el('div', 'card');
     const head    = el('div', 'wg-peers-head');
-    const titleEl = el('div', 'wg-peers-title', 'VPN Peers');
-    const addBtn  = el('button', 'wg-btn wg-btn-primary', '+ Add Peer');
     const listEl  = el('div', 'wg-peer-list');
+    const addBtn  = el('button', 'btn btn-primary btn-md', '+ Add Peer');
+
+    head.append(el('div', 'card-title', 'VPN Peers'), addBtn);
 
     const refresh = async () => {
       try {
         const peers = await api.get('peers');
         listEl.innerHTML = '';
         if (!peers.length) {
-          const empty = el('div', 'wg-empty');
-          empty.append(el('div', 'wg-empty-icon', '🔒'), el('p', null, 'No peers configured. Add your first VPN peer.'));
+          const empty = el('div', 'empty');
+          empty.append(
+            el('div', 'empty-icon', '🔒'),
+            el('div', 'empty-title', 'No peers yet'),
+            el('div', 'empty-desc', 'Add your first VPN peer to get started.'),
+          );
           listEl.appendChild(empty);
         } else {
           for (const peer of peers) {
@@ -575,45 +472,44 @@ const WgPlugin = (() => {
         }
       } catch (err) {
         listEl.innerHTML = '';
-        const errEl = el('div', 'wg-empty');
-        errEl.appendChild(el('p', null, 'Could not load peers: ' + (err.message || 'Unknown error')));
-        listEl.appendChild(errEl);
+        const empty = el('div', 'empty');
+        empty.appendChild(el('div', 'empty-desc', 'Could not load peers: ' + (err.message || 'Unknown error')));
+        listEl.appendChild(empty);
       }
     };
 
-    // Skeleton while loading
+    // Skeleton rows while loading
     for (let i = 0; i < 3; i++) {
       const skel = el('div', 'wg-peer-row');
       skel.style.pointerEvents = 'none';
+      const info = el('div');
       const n = el('div', 'wg-skel'); n.style.cssText = 'width:120px;margin-bottom:8px;';
-      const m = el('div', 'wg-skel'); m.style.width = '80%';
-      const info = el('div', 'wg-peer-info');
+      const m = el('div', 'wg-skel'); m.style.width = '70%';
       info.append(n, m);
-      skel.append(el('div', 'wg-dot wg-dot-off'), info, el('div'));
+      skel.append(el('div', 'dot dot-dim'), info, el('div'));
       listEl.appendChild(skel);
     }
 
     addBtn.addEventListener('click', () => AddModal(api, { onSuccess: refresh }));
-    head.append(titleEl, addBtn);
     card.append(head, listEl);
-
     refresh();
     return card;
   }
 
-  // ── Plugin API (returned to PackageShell) ──────────────────────────────────
+  // ── Plugin API ─────────────────────────────────────────────────────────────
 
   return {
     init(hostEl, api) {
       injectStyles();
-      const root  = el('div', 'wg-root');
-      const inner = el('div', 'wg-inner');
-      inner.append(Header(), ServerCard(api), PeerList(api));
-      root.appendChild(inner);
-      hostEl.appendChild(root);
+      // .page gives us the host app's standard page padding + scroll
+      const page = el('div', 'page');
+      page.append(Header(), ServerCard(api), PeerList(api));
+      hostEl.appendChild(page);
     },
     destroy() {
       document.getElementById(STYLE_ID)?.remove();
+      toastContainer?.remove();
+      toastContainer = null;
     },
   };
 
