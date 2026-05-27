@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import subprocess
-import tempfile
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -64,33 +63,16 @@ def _run(cmd: List[str], input_data: str = None, check: bool = True) -> subproce
 
 
 def _read_conf() -> str:
-    """Read wg0.conf. Copies to a temp file since /etc/wireguard/ is root-only."""
-    tmp = tempfile.mktemp(suffix=".conf")
     try:
-        r = _run(["sudo", "cp", WG_CONF, tmp], check=False)
-        if r.returncode != 0:
-            return ""
-        _run(["sudo", "chmod", "644", tmp])
-        with open(tmp) as f:
-            return f.read()
+        r = _run(["sudo", "cat", WG_CONF], check=False)
+        return r.stdout if r.returncode == 0 else ""
     except Exception:
         return ""
-    finally:
-        try:
-            os.unlink(tmp)
-        except Exception:
-            pass
 
 
 def _write_conf(content: str):
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
-        f.write(content)
-        tmp = f.name
-    try:
-        _run(["sudo", "cp", tmp, WG_CONF])
-        _run(["sudo", "chmod", "600", WG_CONF])
-    finally:
-        os.unlink(tmp)
+    _run(["sudo", "tee", WG_CONF], input_data=content)
+    _run(["sudo", "chmod", "600", WG_CONF])
 
 
 def _load_meta() -> dict:
@@ -264,12 +246,8 @@ async def add_peer(request: PeerCreateRequest, _: User = Depends(require_admin))
     _run(["sudo", "mkdir", "-p", PEERS_DIR])
     _run(["sudo", "chmod", "700", PEERS_DIR])
     key_file = os.path.join(PEERS_DIR, f"{request.name}.key")
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-        f.write(privkey + "\n")
-        tmp = f.name
-    _run(["sudo", "cp", tmp, key_file])
+    _run(["sudo", "tee", key_file], input_data=privkey + "\n")
     _run(["sudo", "chmod", "600", key_file])
-    os.unlink(tmp)
 
     allowed_ips = request.allowed_ips or f"{_next_free_ip(conf)}/32"
 
@@ -347,19 +325,10 @@ async def get_peer_config(name: str, _: User = Depends(require_admin)):
         raise HTTPException(status_code=404, detail=f"Peer '{name}' not found")
 
     key_file = os.path.join(PEERS_DIR, f"{name}.key")
-    tmp_key = tempfile.mktemp(suffix=".key")
-    try:
-        r = _run(["sudo", "cp", key_file, tmp_key], check=False)
-        if r.returncode != 0:
-            raise HTTPException(status_code=404, detail="Private key not found for this peer")
-        _run(["sudo", "chmod", "644", tmp_key])
-        with open(tmp_key) as f:
-            privkey = f.read().strip()
-    finally:
-        try:
-            os.unlink(tmp_key)
-        except Exception:
-            pass
+    r = _run(["sudo", "cat", key_file], check=False)
+    if r.returncode != 0:
+        raise HTTPException(status_code=404, detail="Private key not found for this peer")
+    privkey = r.stdout.strip()
 
     conf = _read_conf()
     allowed_ips = "0.0.0.0/0"

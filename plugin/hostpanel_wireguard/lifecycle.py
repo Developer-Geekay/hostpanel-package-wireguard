@@ -1,8 +1,6 @@
 import logging
 import os
-import pwd
 import subprocess
-import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +13,10 @@ SERVICE_NAME = "hostpanel-wireguard"
 SERVICE_DST  = f"/etc/systemd/system/{SERVICE_NAME}.service"
 
 
-def _panel_user() -> str:
-    return pwd.getpwuid(os.getuid()).pw_name
-
-
 def on_install():
     """Bootstrap WireGuard: create config dirs, generate initial wg0.conf if absent,
     install service. Binaries (wg, wg-quick) arrive via the zip's bin/ directory."""
     logger.info("WireGuard on_install: initialising")
-    panel_user = _panel_user()
 
     # Create /etc/wireguard with restricted permissions
     subprocess.run(["sudo", "mkdir", "-p", "/etc/wireguard"], capture_output=True)
@@ -45,31 +38,28 @@ def on_install():
             "PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; "
             "iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE\n"
         )
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
-            f.write(conf)
-            tmp = f.name
-        try:
-            subprocess.run(["sudo", "cp", tmp, WG_CONF], capture_output=True)
-            subprocess.run(["sudo", "chmod", "600", WG_CONF], capture_output=True)
-            logger.info("WireGuard on_install: generated initial wg0.conf with new key pair")
-        finally:
-            os.unlink(tmp)
+        subprocess.run(["sudo", "tee", WG_CONF], input=conf, text=True, capture_output=True)
+        subprocess.run(["sudo", "chmod", "600", WG_CONF], capture_output=True)
+        logger.info("WireGuard on_install: generated initial wg0.conf with new key pair")
 
-    # Create metadata dir owned by panel user so plugin can write without sudo
-    subprocess.run(["sudo", "mkdir", "-p", WIREGUARD_DIR], capture_output=True)
-    subprocess.run(["sudo", "chown", f"{panel_user}:{panel_user}", WIREGUARD_DIR], capture_output=True)
+    # WIREGUARD_DIR is created by the package manager (os.makedirs) running as
+    # the panel user, so it already has correct ownership — no sudo needed here.
+    os.makedirs(WIREGUARD_DIR, exist_ok=True)
 
-    # Install service file if package manager upload path didn't do it already
+    # Install service file (package manager installs it from service/, this is a fallback)
     if not os.path.exists(SERVICE_DST):
-        try:
-            import importlib.resources as pkg_res
-            svc_src = pkg_res.files("hostpanel_wireguard").joinpath(f"{SERVICE_NAME}.service")
-            with pkg_res.as_file(svc_src) as p:
-                subprocess.run(["sudo", "cp", str(p), SERVICE_DST], capture_output=True)
+        svc_src = os.path.join(WIREGUARD_DIR, "service", f"{SERVICE_NAME}.service")
+        if os.path.exists(svc_src):
+            try:
+                with open(svc_src) as f:
+                    content = f.read()
+                subprocess.run(["sudo", "tee", SERVICE_DST], input=content, text=True, capture_output=True)
                 subprocess.run(["sudo", "chmod", "644", SERVICE_DST], capture_output=True)
-                logger.info(f"Installed service file → {SERVICE_DST}")
-        except Exception as e:
-            logger.warning(f"Could not install bundled service file: {e}")
+                logger.info(f"Installed service file -> {SERVICE_DST}")
+            except Exception as e:
+                logger.warning(f"Could not install service file: {e}")
+        else:
+            logger.warning(f"Service file not found at {svc_src}")
 
     subprocess.run(["sudo", "systemctl", "daemon-reload"], capture_output=True)
     subprocess.run(["sudo", "systemctl", "enable", SERVICE_NAME], capture_output=True)

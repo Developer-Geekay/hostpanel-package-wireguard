@@ -4,7 +4,6 @@ setup(
     name="hostpanel-wireguard",
     version="1.1.0",
     packages=find_packages(),
-    package_data={"hostpanel_wireguard": ["*.service"]},
     install_requires=["fastapi", "pydantic", "qrcode[pil]"],
     entry_points={
         "hostpanel.modules": [

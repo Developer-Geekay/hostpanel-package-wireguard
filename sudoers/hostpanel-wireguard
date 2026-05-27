@@ -1,31 +1,6 @@
 # HostPanel wireguard plugin sudoers — installed by package manager on upload
 # Removed automatically when the plugin is uninstalled.
-
-Defaults:%hostpanel !requiretty
-
-# ── WireGuard config read/write ────────────────────────────────────────────────
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/cp /etc/wireguard/wg0.conf *
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/cp * /etc/wireguard/wg0.conf
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/chmod 600 /etc/wireguard/wg0.conf
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/chmod 644 /tmp/*.conf
-
-# ── Peer key management ────────────────────────────────────────────────────────
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/mkdir -p /etc/wireguard/peers
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/chmod 700 /etc/wireguard/peers
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/cp * /etc/wireguard/peers/*
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/chmod 600 /etc/wireguard/peers/*
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/cp /etc/wireguard/peers/* *
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/chmod 644 /tmp/*.key
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/wireguard/peers/*
+# File operations (cp, chmod, chown, mkdir, rm) are covered by core sudoers.
 
 # ── Bundled WireGuard binary operations ───────────────────────────────────────
 %hostpanel ALL=(root) NOPASSWD: /opt/hostpanel/plugins/wireguard/wg *
-
-# ── WireGuard setup (on_install) ──────────────────────────────────────────────
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/mkdir -p /etc/wireguard
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/chmod 700 /etc/wireguard
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/mkdir -p /opt/hostpanel/plugins/wireguard
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/chown * /opt/hostpanel/plugins/wireguard
-
-# ── Force-uninstall cleanup ────────────────────────────────────────────────────
-%hostpanel ALL=(root) NOPASSWD: /usr/bin/rm -rf /opt/hostpanel/plugins/wireguard
