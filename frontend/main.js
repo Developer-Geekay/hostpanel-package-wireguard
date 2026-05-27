@@ -1,10 +1,19 @@
-(function () {
+/**
+ * WireGuard Plugin – UI building blocks
+ *
+ * Each section of the UI is a named factory function that returns a DOM node.
+ * Blocks compose each other; nothing is hidden inside an anonymous wrapper.
+ *
+ * Registered on window.__hpkg['wireguard'] for PackageShell to call.
+ */
+
+const WgPlugin = (() => {
   'use strict';
 
-  window.__hpkg = window.__hpkg || {};
-
-  // ── CSS ───────────────────────────────────────────────────────────────────
+  // ── Constants ──────────────────────────────────────────────────────────────
   const STYLE_ID = 'wg-pkg-styles';
+
+  // ── CSS ────────────────────────────────────────────────────────────────────
   const CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -211,10 +220,11 @@
     @keyframes wg-spin { to { transform: rotate(360deg); } }
   `;
 
-  // ── Utilities ─────────────────────────────────────────────────────────────
+  // ── Primitives ─────────────────────────────────────────────────────────────
+
   function el(tag, cls, text) {
     const e = document.createElement(tag);
-    if (cls) e.className = cls;
+    if (cls)      e.className = cls;
     if (text != null) e.textContent = text;
     return e;
   }
@@ -238,8 +248,8 @@
   function formatHandshake(epoch) {
     if (!epoch || epoch === '0') return 'Never';
     const secs = Date.now() / 1000 - parseInt(epoch, 10);
-    if (secs < 60) return 'Just now';
-    if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+    if (secs < 60)    return 'Just now';
+    if (secs < 3600)  return Math.floor(secs / 60) + 'm ago';
     if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
     return Math.floor(secs / 86400) + 'd ago';
   }
@@ -249,43 +259,55 @@
     return (Date.now() / 1000 - parseInt(peer.last_handshake, 10)) < 180;
   }
 
-  // ── Toast ─────────────────────────────────────────────────────────────────
-  function toast(msg, ok = true) {
+  // ── Building Block: Toast ──────────────────────────────────────────────────
+  // Self-mounted; no return value needed.
+
+  function Toast(msg, ok = true) {
     const t = el('div', 'wg-toast ' + (ok ? 'wg-toast-ok' : 'wg-toast-err'));
-    const icon = el('span', null, ok ? '✓' : '✕');
-    const text = el('span', null, msg);
-    t.append(icon, text);
+    t.append(el('span', null, ok ? '✓' : '✕'), el('span', null, msg));
     document.body.appendChild(t);
-    const hide = () => {
+    setTimeout(() => {
       t.classList.add('wg-toast-gone');
       setTimeout(() => t.remove(), 350);
-    };
-    setTimeout(hide, 3200);
+    }, 3200);
   }
 
-  // ── Build peer row DOM ────────────────────────────────────────────────────
-  function makePeerRow(peer, onQr, onDelete) {
-    const row = el('div', 'wg-peer-row');
+  // ── Building Block: Header ─────────────────────────────────────────────────
 
-    const dot = el('div', 'wg-dot ' + (isOnline(peer) ? 'wg-dot-on' : 'wg-dot-off'));
+  function Header() {
+    const header = el('div', 'wg-header');
+    const icon   = el('div', 'wg-header-icon', '🔒');
+    const text   = el('div');
+    text.append(
+      el('div', 'wg-title', 'WireGuard VPN'),
+      el('div', 'wg-subtitle', 'Peer management & key distribution')
+    );
+    header.append(icon, text);
+    return header;
+  }
+
+  // ── Building Block: PeerRow ────────────────────────────────────────────────
+
+  function PeerRow(peer, { onQr, onDelete }) {
+    const row  = el('div', 'wg-peer-row');
+    const dot  = el('div', 'wg-dot ' + (isOnline(peer) ? 'wg-dot-on' : 'wg-dot-off'));
 
     const info = el('div', 'wg-peer-info');
-    const name = el('div', 'wg-peer-name');
-    name.textContent = peer.name;
-
+    const name = el('div', 'wg-peer-name', peer.name);
     const meta = el('div', 'wg-peer-meta');
-    const ipSpan = el('span', 'wg-peer-ip');
-    ipSpan.textContent = peer.allowed_ips;
-    const hsSpan = el('span', null, formatHandshake(peer.last_handshake));
-    const rxSpan = el('span', null, '↓ ' + formatBytes(peer.transfer_rx));
-    const txSpan = el('span', null, '↑ ' + formatBytes(peer.transfer_tx));
-    meta.append(ipSpan, hsSpan, rxSpan, txSpan);
+    const ip   = el('span', 'wg-peer-ip', peer.allowed_ips);
+    meta.append(
+      ip,
+      el('span', null, formatHandshake(peer.last_handshake)),
+      el('span', null, '↓ ' + formatBytes(peer.transfer_rx)),
+      el('span', null, '↑ ' + formatBytes(peer.transfer_tx))
+    );
     info.append(name, meta);
 
     const actions = el('div', 'wg-peer-actions');
-    const qrBtn = el('button', 'wg-btn wg-btn-ghost wg-btn-sm wg-btn-icon', '◫ QR');
+    const qrBtn   = el('button', 'wg-btn wg-btn-ghost wg-btn-sm wg-btn-icon', '◫ QR');
+    const delBtn  = el('button', 'wg-btn wg-btn-danger wg-btn-sm', 'Remove');
     qrBtn.addEventListener('click', () => onQr(peer.name));
-    const delBtn = el('button', 'wg-btn wg-btn-danger wg-btn-sm', 'Remove');
     delBtn.addEventListener('click', () => onDelete(peer.name));
     actions.append(qrBtn, delBtn);
 
@@ -293,36 +315,34 @@
     return row;
   }
 
-  // ── Add-peer modal ────────────────────────────────────────────────────────
-  function showAddModal(api, onSuccess) {
+  // ── Building Block: AddModal ───────────────────────────────────────────────
+
+  function AddModal(api, { onSuccess }) {
     const overlay = el('div', 'wg-overlay');
+    const modal   = el('div', 'wg-modal');
 
-    const modal = el('div', 'wg-modal');
-    const title = el('div', 'wg-modal-title', 'Add Peer');
-
-    const nameField = el('div', 'wg-field');
-    const nameLabel = el('label', 'wg-field-label', 'Peer name');
-    const nameInput = el('input', 'wg-input');
+    const nameField  = el('div', 'wg-field');
+    const nameLabel  = el('label', 'wg-field-label', 'Peer name');
+    const nameInput  = el('input', 'wg-input');
     nameInput.placeholder = 'e.g. laptop, phone-ios';
     nameInput.type = 'text';
     nameField.append(nameLabel, nameInput);
 
-    const ipField = el('div', 'wg-field');
-    const ipLabel = el('label', 'wg-field-label', 'Allowed IPs (optional — auto-assigned if blank)');
-    const ipInput = el('input', 'wg-input');
+    const ipField  = el('div', 'wg-field');
+    const ipLabel  = el('label', 'wg-field-label', 'Allowed IPs (optional — auto-assigned if blank)');
+    const ipInput  = el('input', 'wg-input');
     ipInput.placeholder = '10.66.66.x/32';
     ipInput.type = 'text';
     ipField.append(ipLabel, ipInput);
 
-    const footer = el('div', 'wg-modal-footer');
+    const footer    = el('div', 'wg-modal-footer');
     const cancelBtn = el('button', 'wg-btn wg-btn-ghost', 'Cancel');
-    const addBtn = el('button', 'wg-btn wg-btn-primary', 'Add Peer');
-
+    const addBtn    = el('button', 'wg-btn wg-btn-primary', 'Add Peer');
     footer.append(cancelBtn, addBtn);
-    modal.append(title, nameField, ipField, footer);
+
+    modal.append(el('div', 'wg-modal-title', 'Add Peer'), nameField, ipField, footer);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
-
     nameInput.focus();
 
     const close = () => overlay.remove();
@@ -340,11 +360,11 @@
         const ip = ipInput.value.trim();
         if (ip) body.allowed_ips = ip;
         await api.post('peers', body);
-        toast('Peer "' + name + '" added');
+        Toast('Peer "' + name + '" added');
         close();
         onSuccess();
       } catch (err) {
-        toast(err.message || 'Failed to add peer', false);
+        Toast(err.message || 'Failed to add peer', false);
         addBtn.disabled = false;
         addBtn.textContent = 'Add Peer';
       }
@@ -354,23 +374,25 @@
     nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
   }
 
-  // ── Delete confirm modal ──────────────────────────────────────────────────
-  function showDeleteModal(name, api, onSuccess) {
+  // ── Building Block: DeleteModal ────────────────────────────────────────────
+
+  function DeleteModal(name, api, { onSuccess }) {
     const overlay = el('div', 'wg-overlay');
-    const modal = el('div', 'wg-modal');
-    const title = el('div', 'wg-modal-title', 'Remove Peer');
+    const modal   = el('div', 'wg-modal');
+
     const msg = el('p', 'wg-confirm-msg');
-    msg.appendChild(document.createTextNode('Remove peer '));
-    const strong = el('strong', null, name);
-    msg.appendChild(strong);
-    msg.appendChild(document.createTextNode('? This will revoke VPN access.'));
+    msg.append(
+      document.createTextNode('Remove peer '),
+      el('strong', null, name),
+      document.createTextNode('? This will revoke VPN access.')
+    );
 
-    const footer = el('div', 'wg-modal-footer');
+    const footer    = el('div', 'wg-modal-footer');
     const cancelBtn = el('button', 'wg-btn wg-btn-ghost', 'Cancel');
-    const delBtn = el('button', 'wg-btn wg-btn-danger', 'Remove');
-
+    const delBtn    = el('button', 'wg-btn wg-btn-danger', 'Remove');
     footer.append(cancelBtn, delBtn);
-    modal.append(title, msg, footer);
+
+    modal.append(el('div', 'wg-modal-title', 'Remove Peer'), msg, footer);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
@@ -384,31 +406,30 @@
       delBtn.appendChild(el('span', 'wg-spin'));
       try {
         await api.delete('peers/' + encodeURIComponent(name));
-        toast('Peer "' + name + '" removed');
+        Toast('Peer "' + name + '" removed');
         close();
         onSuccess();
       } catch (err) {
-        toast(err.message || 'Failed to remove peer', false);
+        Toast(err.message || 'Failed to remove peer', false);
         delBtn.disabled = false;
         delBtn.textContent = 'Remove';
       }
     });
   }
 
-  // ── QR / Config sheet ─────────────────────────────────────────────────────
-  async function showQRSheet(name, api) {
+  // ── Building Block: QRSheet ────────────────────────────────────────────────
+
+  async function QRSheet(name, api) {
     const overlay = el('div', 'wg-overlay');
-    const sheet = el('div', 'wg-qr-sheet');
+    const sheet   = el('div', 'wg-qr-sheet');
 
-    const head = el('div', 'wg-qr-head');
-    const qrTitle = el('div', 'wg-qr-title');
-    qrTitle.textContent = name;
-    const closeBtn = el('button', 'wg-close-btn', '×');
+    const head      = el('div', 'wg-qr-head');
+    const closeBtn  = el('button', 'wg-close-btn', '×');
     closeBtn.setAttribute('aria-label', 'Close');
-    head.append(qrTitle, closeBtn);
+    head.append(el('div', 'wg-qr-title', name), closeBtn);
 
-    const tabRow = el('div', 'wg-tab-row');
-    const qrTab = el('button', 'wg-tab wg-tab-active', 'QR Code');
+    const tabRow  = el('div', 'wg-tab-row');
+    const qrTab   = el('button', 'wg-tab wg-tab-active', 'QR Code');
     const confTab = el('button', 'wg-tab', 'Config File');
     tabRow.append(qrTab, confTab);
 
@@ -427,7 +448,6 @@
     closeBtn.addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
-    // Fetch both in parallel
     let configText = '';
     let qrObjectUrl = null;
 
@@ -436,50 +456,38 @@
         api.raw('GET', 'peers/' + encodeURIComponent(name) + '/config'),
         api.raw('GET', 'peers/' + encodeURIComponent(name) + '/qr'),
       ]);
-
-      if (confRes.ok) {
-        const data = await confRes.json();
-        configText = data.config || '';
-      }
-      if (qrRes.ok) {
-        const blob = await qrRes.blob();
-        qrObjectUrl = URL.createObjectURL(blob);
-      }
+      if (confRes.ok) { const d = await confRes.json(); configText = d.config || ''; }
+      if (qrRes.ok)   { qrObjectUrl = URL.createObjectURL(await qrRes.blob()); }
     } catch {
-      toast('Could not load peer config', false);
+      Toast('Could not load peer config', false);
     }
 
     const renderQr = () => {
       content.innerHTML = '';
+      dlRow.innerHTML   = '';
       if (qrObjectUrl) {
         const img = el('img', 'wg-qr-img');
         img.src = qrObjectUrl;
         img.alt = 'WireGuard QR code for ' + name;
         content.appendChild(img);
+        const dl = el('a', 'wg-btn wg-btn-ghost wg-btn-sm', 'Download PNG');
+        dl.href = qrObjectUrl; dl.download = name + '.png';
+        dlRow.appendChild(dl);
       } else {
         content.appendChild(el('p', null, 'QR code unavailable (qrcode library not installed)'));
-      }
-      dlRow.innerHTML = '';
-      if (qrObjectUrl) {
-        const dl = el('a', 'wg-btn wg-btn-ghost wg-btn-sm', 'Download PNG');
-        dl.href = qrObjectUrl;
-        dl.download = name + '.png';
-        dlRow.appendChild(dl);
       }
     };
 
     const renderConf = () => {
       content.innerHTML = '';
+      dlRow.innerHTML   = '';
       const pre = el('pre', 'wg-conf-code');
       pre.textContent = configText || '# Config not available';
       content.appendChild(pre);
-      dlRow.innerHTML = '';
       if (configText) {
         const blob = new Blob([configText], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const dl = el('a', 'wg-btn wg-btn-ghost wg-btn-sm', 'Download .conf');
-        dl.href = url;
-        dl.download = name + '.conf';
+        const dl   = el('a', 'wg-btn wg-btn-ghost wg-btn-sm', 'Download .conf');
+        dl.href = URL.createObjectURL(blob); dl.download = name + '.conf';
         dlRow.appendChild(dl);
       }
     };
@@ -498,16 +506,17 @@
     renderQr();
   }
 
-  // ── Render server info card ───────────────────────────────────────────────
-  function renderServerCard(container, api) {
-    const card = el('div', 'wg-card');
+  // ── Building Block: ServerCard ─────────────────────────────────────────────
+
+  function ServerCard(api) {
+    const card  = el('div', 'wg-card');
     const label = el('div', 'wg-card-label', 'Server');
-    const grid = el('div', 'wg-info-grid');
+    const grid  = el('div', 'wg-info-grid');
 
     const fields = [
-      { key: 'endpoint', label: 'Endpoint' },
-      { key: 'address',  label: 'Interface IP' },
-      { key: 'port',     label: 'Port' },
+      { key: 'endpoint',   label: 'Endpoint' },
+      { key: 'address',    label: 'Interface IP' },
+      { key: 'port',       label: 'Port' },
       { key: 'public_key', label: 'Public Key' },
     ];
 
@@ -523,65 +532,45 @@
     }
 
     card.append(label, grid);
-    container.appendChild(card);
 
     api.get('server/info').then(info => {
       for (const f of fields) {
-        const el2 = valueEls[f.key];
-        el2.className = 'wg-info-val';
-        el2.textContent = String(info[f.key] ?? '—');
+        const v = valueEls[f.key];
+        v.className   = 'wg-info-val';
+        v.textContent = String(info[f.key] ?? '-');
       }
     }).catch(() => {
-      for (const el2 of Object.values(valueEls)) {
-        el2.className = 'wg-info-val';
-        el2.textContent = 'Unavailable';
+      for (const v of Object.values(valueEls)) {
+        v.className = 'wg-info-val'; v.textContent = 'Unavailable';
       }
     });
+
+    return card;
   }
 
-  // ── Render peers section ──────────────────────────────────────────────────
-  function renderPeers(container, api) {
-    const card = el('div', 'wg-card');
+  // ── Building Block: PeerList ───────────────────────────────────────────────
 
-    const head = el('div', 'wg-peers-head');
+  function PeerList(api) {
+    const card    = el('div', 'wg-card');
+    const head    = el('div', 'wg-peers-head');
     const titleEl = el('div', 'wg-peers-title', 'VPN Peers');
-    const addBtn = el('button', 'wg-btn wg-btn-primary', '+ Add Peer');
-    addBtn.addEventListener('click', () => showAddModal(api, () => refreshPeers()));
-    head.append(titleEl, addBtn);
+    const addBtn  = el('button', 'wg-btn wg-btn-primary', '+ Add Peer');
+    const listEl  = el('div', 'wg-peer-list');
 
-    const listEl = el('div', 'wg-peer-list');
-
-    // skeleton
-    for (let i = 0; i < 3; i++) {
-      const skel = el('div', 'wg-peer-row');
-      skel.style.pointerEvents = 'none';
-      const dot = el('div', 'wg-dot wg-dot-off');
-      const info = el('div', 'wg-peer-info');
-      const n = el('div', 'wg-skel'); n.style.cssText = 'width:120px;margin-bottom:8px;';
-      const m = el('div', 'wg-skel'); m.style.width = '80%';
-      info.append(n, m);
-      skel.append(dot, info, el('div', null));
-      listEl.appendChild(skel);
-    }
-
-    card.append(head, listEl);
-    container.appendChild(card);
-
-    const refreshPeers = async () => {
+    const refresh = async () => {
       try {
         const peers = await api.get('peers');
         listEl.innerHTML = '';
         if (!peers.length) {
           const empty = el('div', 'wg-empty');
-          empty.appendChild(el('div', 'wg-empty-icon', '🔒'));
-          empty.appendChild(el('p', null, 'No peers configured. Add your first VPN peer.'));
+          empty.append(el('div', 'wg-empty-icon', '🔒'), el('p', null, 'No peers configured. Add your first VPN peer.'));
           listEl.appendChild(empty);
         } else {
           for (const peer of peers) {
-            listEl.appendChild(makePeerRow(peer,
-              (name) => showQRSheet(name, api),
-              (name) => showDeleteModal(name, api, refreshPeers)
-            ));
+            listEl.appendChild(PeerRow(peer, {
+              onQr:     name => QRSheet(name, api),
+              onDelete: name => DeleteModal(name, api, { onSuccess: refresh }),
+            }));
           }
         }
       } catch (err) {
@@ -592,36 +581,44 @@
       }
     };
 
-    refreshPeers();
+    // Skeleton while loading
+    for (let i = 0; i < 3; i++) {
+      const skel = el('div', 'wg-peer-row');
+      skel.style.pointerEvents = 'none';
+      const n = el('div', 'wg-skel'); n.style.cssText = 'width:120px;margin-bottom:8px;';
+      const m = el('div', 'wg-skel'); m.style.width = '80%';
+      const info = el('div', 'wg-peer-info');
+      info.append(n, m);
+      skel.append(el('div', 'wg-dot wg-dot-off'), info, el('div'));
+      listEl.appendChild(skel);
+    }
+
+    addBtn.addEventListener('click', () => AddModal(api, { onSuccess: refresh }));
+    head.append(titleEl, addBtn);
+    card.append(head, listEl);
+
+    refresh();
+    return card;
   }
 
-  // ── Plugin API ────────────────────────────────────────────────────────────
-  window.__hpkg['wireguard'] = {
+  // ── Plugin API (returned to PackageShell) ──────────────────────────────────
+
+  return {
     init(hostEl, api) {
       injectStyles();
-
-      const root = el('div', 'wg-root');
+      const root  = el('div', 'wg-root');
       const inner = el('div', 'wg-inner');
-
-      // Header
-      const header = el('div', 'wg-header');
-      const icon = el('div', 'wg-header-icon', '🔒');
-      const hText = el('div');
-      hText.appendChild(el('div', 'wg-title', 'WireGuard VPN'));
-      hText.appendChild(el('div', 'wg-subtitle', 'Peer management & key distribution'));
-      header.append(icon, hText);
-      inner.appendChild(header);
-
-      renderServerCard(inner, api);
-      renderPeers(inner, api);
-
+      inner.append(Header(), ServerCard(api), PeerList(api));
       root.appendChild(inner);
       hostEl.appendChild(root);
     },
-
     destroy() {
-      const s = document.getElementById(STYLE_ID);
-      if (s) s.remove();
+      document.getElementById(STYLE_ID)?.remove();
     },
   };
+
 })();
+
+// ── Register with HostPanel package loader ─────────────────────────────────────
+window.__hpkg = window.__hpkg || {};
+window.__hpkg['wireguard'] = WgPlugin;
