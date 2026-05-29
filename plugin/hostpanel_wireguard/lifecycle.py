@@ -4,13 +4,33 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-WG_BIN       = "/opt/hostpanel/plugins/wireguard/wg"
-WG_QUICK     = "/opt/hostpanel/plugins/wireguard/wg-quick"
-WG_CONF      = "/etc/wireguard/wg0.conf"
-PEERS_DIR    = "/etc/wireguard/peers"
+WG_BIN        = "/opt/hostpanel/plugins/wireguard/wg"
+WG_QUICK      = "/opt/hostpanel/plugins/wireguard/wg-quick"
+WG_CONF       = "/etc/wireguard/wg0.conf"
+PEERS_DIR     = "/etc/wireguard/peers"
 WIREGUARD_DIR = "/opt/hostpanel/plugins/wireguard"
-SERVICE_NAME = "hostpanel-wireguard"
-SERVICE_DST  = f"/etc/systemd/system/{SERVICE_NAME}.service"
+SERVICE_NAME  = "hostpanel-wireguard"
+SERVICE_DST   = f"/etc/systemd/system/{SERVICE_NAME}.service"
+SYSCTL_FILE   = "/etc/sysctl.d/99-wireguard.conf"
+
+
+def _get_outbound_iface() -> str:
+    """Detect the default outbound network interface (e.g. eth0, ens3, enp1s0)."""
+    r = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True)
+    parts = r.stdout.split()
+    try:
+        return parts[parts.index("dev") + 1]
+    except (ValueError, IndexError):
+        return "eth0"
+
+
+def _enable_ip_forward():
+    """Enable IPv4 forwarding immediately and persist across reboots."""
+    subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], capture_output=True)
+    subprocess.run(
+        ["sudo", "tee", SYSCTL_FILE],
+        input="net.ipv4.ip_forward=1\n", text=True, capture_output=True,
+    )
 
 
 def on_install():
@@ -18,14 +38,16 @@ def on_install():
     install service. Binaries (wg, wg-quick) arrive via the zip's bin/ directory."""
     logger.info("WireGuard on_install: initialising")
 
-    # Create /etc/wireguard with restricted permissions
     subprocess.run(["sudo", "mkdir", "-p", "/etc/wireguard"], capture_output=True)
     subprocess.run(["sudo", "mkdir", "-p", PEERS_DIR], capture_output=True)
     subprocess.run(["sudo", "chmod", "700", "/etc/wireguard"], capture_output=True)
     subprocess.run(["sudo", "chmod", "700", PEERS_DIR], capture_output=True)
 
+    _enable_ip_forward()
+
     # Generate initial wg0.conf only on first install
     if not os.path.exists(WG_CONF):
+        iface = _get_outbound_iface()
         priv = subprocess.run([WG_BIN, "genkey"], capture_output=True, text=True)
         privkey = priv.stdout.strip()
         conf = (
@@ -33,20 +55,18 @@ def on_install():
             "Address = 10.8.0.1/24\n"
             "ListenPort = 51820\n"
             f"PrivateKey = {privkey}\n"
-            "PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; "
-            "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE\n"
-            "PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; "
-            "iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE\n"
+            f"PostUp = sysctl -w net.ipv4.ip_forward=1; "
+            f"iptables -A FORWARD -i wg0 -j ACCEPT; "
+            f"iptables -t nat -A POSTROUTING -o {iface} -j MASQUERADE\n"
+            f"PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; "
+            f"iptables -t nat -D POSTROUTING -o {iface} -j MASQUERADE\n"
         )
         subprocess.run(["sudo", "tee", WG_CONF], input=conf, text=True, capture_output=True)
         subprocess.run(["sudo", "chmod", "600", WG_CONF], capture_output=True)
-        logger.info("WireGuard on_install: generated initial wg0.conf with new key pair")
+        logger.info(f"WireGuard on_install: generated wg0.conf (iface={iface})")
 
-    # WIREGUARD_DIR is created by the package manager (os.makedirs) running as
-    # the panel user, so it already has correct ownership — no sudo needed here.
     os.makedirs(WIREGUARD_DIR, exist_ok=True)
 
-    # Install service file (package manager installs it from service/, this is a fallback)
     if not os.path.exists(SERVICE_DST):
         svc_src = os.path.join(WIREGUARD_DIR, "service", f"{SERVICE_NAME}.service")
         if os.path.exists(svc_src):
@@ -58,8 +78,6 @@ def on_install():
                 logger.info(f"Installed service file -> {SERVICE_DST}")
             except Exception as e:
                 logger.warning(f"Could not install service file: {e}")
-        else:
-            logger.warning(f"Service file not found at {svc_src}")
 
     subprocess.run(["sudo", "systemctl", "daemon-reload"], capture_output=True)
     subprocess.run(["sudo", "systemctl", "enable", SERVICE_NAME], capture_output=True)
@@ -68,34 +86,26 @@ def on_install():
 
 
 def pre_uninstall(force: bool = False):
-    """Stop and remove WireGuard service and plugin data. VPN config at
-    /etc/wireguard/ is preserved so it can be restored on reinstall."""
     logger.info(f"WireGuard pre_uninstall: force={force}")
-
     subprocess.run(["sudo", "systemctl", "stop", SERVICE_NAME], capture_output=True)
     subprocess.run(["sudo", "systemctl", "disable", SERVICE_NAME], capture_output=True)
     subprocess.run(["sudo", "rm", "-f", SERVICE_DST], capture_output=True)
     subprocess.run(["sudo", "systemctl", "daemon-reload"], capture_output=True)
-    logger.info("WireGuard pre_uninstall: service stopped and removed")
-
-    # Remove plugin data directory
     if os.path.isdir(WIREGUARD_DIR):
         subprocess.run(["sudo", "rm", "-rf", WIREGUARD_DIR], capture_output=True)
-        logger.info(f"WireGuard pre_uninstall: removed {WIREGUARD_DIR}")
-
-    # Remove plugin sudoers last — all cleanup above still needs those permissions
     subprocess.run(["sudo", "rm", "-f", "/etc/sudoers.d/hostpanel-wireguard"], capture_output=True)
     logger.info("WireGuard pre_uninstall: complete")
 
 
 def on_startup():
-    """Called at server startup. Ensures the WireGuard service is running."""
+    """Ensure IP forwarding is on and WireGuard service is running."""
+    _enable_ip_forward()
     result = subprocess.run(
         ["sudo", "systemctl", "is-active", SERVICE_NAME],
         capture_output=True, text=True
     )
     if result.returncode != 0:
-        logger.info(f"WireGuard on_startup: service not active ({result.stdout.strip()}), starting...")
+        logger.info(f"WireGuard on_startup: service not active, starting...")
         subprocess.run(["sudo", "systemctl", "start", SERVICE_NAME], capture_output=True)
     else:
         logger.info("WireGuard on_startup: service is active")

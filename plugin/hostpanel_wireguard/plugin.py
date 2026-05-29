@@ -85,6 +85,7 @@ class ServerStatus(BaseModel):
     up: bool
     peers_online: int
     peers_total: int
+    ip_forward: bool
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -310,13 +311,30 @@ async def get_server_info(_: User = Depends(require_admin)):
     )
 
 
+def _ip_forward_enabled() -> bool:
+    try:
+        r = subprocess.run(["cat", "/proc/sys/net/ipv4/ip_forward"], capture_output=True, text=True)
+        return r.stdout.strip() == "1"
+    except Exception:
+        return False
+
+
+def _get_outbound_iface() -> str:
+    r = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True)
+    parts = r.stdout.split()
+    try:
+        return parts[parts.index("dev") + 1]
+    except (ValueError, IndexError):
+        return "eth0"
+
+
 @router.get("/server/status", response_model=ServerStatus)
 async def get_server_status(_: User = Depends(require_admin)):
-    # Use `ip link show wg0` — no sudo needed, reliable interface existence check
     up = subprocess.run(["ip", "link", "show", "wg0"], capture_output=True).returncode == 0
+    ip_fwd = _ip_forward_enabled()
     meta = _load_meta()
     if not up:
-        return ServerStatus(up=False, peers_online=0, peers_total=len(meta))
+        return ServerStatus(up=False, peers_online=0, peers_total=len(meta), ip_forward=ip_fwd)
     stats = _get_live_stats()
     now = time.time()
     peers = _parse_peers_from_conf(_read_conf())
@@ -325,7 +343,49 @@ async def get_server_status(_: User = Depends(require_admin)):
         if stats.get(p.get("PublicKey", ""), {}).get("last_handshake")
         and (now - int(stats[p["PublicKey"]]["last_handshake"])) < 180
     )
-    return ServerStatus(up=True, peers_online=online, peers_total=len(meta))
+    return ServerStatus(up=True, peers_online=online, peers_total=len(meta), ip_forward=ip_fwd)
+
+
+@router.post("/server/fix-routing")
+async def fix_routing(_: User = Depends(require_admin)):
+    """Enable IP forwarding and update PostUp/PostDown to use the correct outbound interface."""
+    iface = _get_outbound_iface()
+
+    # Enable IP forwarding immediately and persist
+    subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], capture_output=True)
+    subprocess.run(
+        ["sudo", "tee", "/etc/sysctl.d/99-wireguard.conf"],
+        input="net.ipv4.ip_forward=1\n", text=True, capture_output=True,
+    )
+
+    # Rewrite PostUp/PostDown in wg0.conf with correct interface + sysctl
+    conf = _read_conf()
+    new_lines = []
+    for line in conf.splitlines(keepends=True):
+        s = line.strip()
+        if s.startswith("PostUp"):
+            line = (
+                f"PostUp = sysctl -w net.ipv4.ip_forward=1; "
+                f"iptables -A FORWARD -i wg0 -j ACCEPT; "
+                f"iptables -t nat -A POSTROUTING -o {iface} -j MASQUERADE\n"
+            )
+        elif s.startswith("PostDown"):
+            line = (
+                f"PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; "
+                f"iptables -t nat -D POSTROUTING -o {iface} -j MASQUERADE\n"
+            )
+        new_lines.append(line)
+    _write_conf("".join(new_lines))
+
+    # Restart service so new PostUp/PostDown take effect
+    subprocess.run(["sudo", "systemctl", "restart", "hostpanel-wireguard"], capture_output=True)
+
+    return {
+        "outbound_iface": iface,
+        "ip_forward_enabled": True,
+        "conf_updated": True,
+        "service_restarted": True,
+    }
 
 
 @router.get("/server/config")

@@ -635,8 +635,9 @@
 
   function ServerCard({ api }) {
     const { data: info, loading: infoLoading }     = useApi(() => api.get('server/info'),   []);
-    const { data: status, loading: statusLoading } = useApi(() => api.get('server/status'), []);
-    const [copied, setCopied] = useState(false);
+    const { data: status, loading: statusLoading, refetch: refetchStatus } = useApi(() => api.get('server/status'), []);
+    const [copied,  setCopied]  = useState(false);
+    const [fixing,  setFixing]  = useState(false);
 
     const handleCopyKey = () => {
       if (info?.public_key) {
@@ -652,11 +653,25 @@
         if (!resp.ok) throw new Error('Failed to fetch config');
         triggerDownload(await resp.text(), 'wg0.conf');
       } catch (e) {
-        alert(e.message || 'Export failed');
+        toast.err(e.message || 'Export failed');
+      }
+    };
+
+    const handleFixRouting = async () => {
+      setFixing(true);
+      try {
+        const r = await api.post('server/fix-routing', {});
+        toast.ok('Routing fixed — IP forwarding enabled, nginx reloaded on iface ' + r.outbound_iface);
+        refetchStatus();
+      } catch (e) {
+        toast.err(e.message || 'Fix failed');
+      } finally {
+        setFixing(false);
       }
     };
 
     const up = status?.up;
+    const ipFwd = status?.ip_forward;
     const loading = infoLoading || statusLoading;
 
     const fields = [
@@ -709,6 +724,21 @@
             </div>
           </div>
         </div>
+
+        ${!loading && up && ipFwd === false && html`
+          <div style=${{
+            margin: '10px 0 6px', padding: '10px 12px',
+            background: 'rgba(234,179,8,.1)', color: '#ca8a04',
+            border: '1px solid rgba(234,179,8,.25)', borderRadius: 'var(--radius-sm)',
+            fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <span>⚠ IP forwarding is disabled — peers cannot route internet traffic through this VPN.</span>
+            <button class="btn btn-sm" style=${{ background: '#ca8a04', color: '#fff', border: 'none', flexShrink: 0 }}
+              onClick=${handleFixRouting} disabled=${fixing}>
+              ${fixing ? html`<span class="wg-spin" /> Fixing…` : 'Fix Now'}
+            </button>
+          </div>
+        `}
 
         <div class="wg-server-footer">
           <button class="btn btn-ghost btn-sm" onClick=${handleExport} title="Download wg0.conf">
