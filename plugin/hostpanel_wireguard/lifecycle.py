@@ -45,14 +45,21 @@ def on_install():
 
     _enable_ip_forward()
 
-    # Generate initial wg0.conf only on first install
+    # If conf exists but uses old 10.8.0.x subnet, remove it so it's regenerated
+    if os.path.exists(WG_CONF):
+        existing = subprocess.run(["sudo", "cat", WG_CONF], capture_output=True, text=True).stdout
+        if "10.8.0." in existing:
+            subprocess.run(["sudo", "rm", "-f", WG_CONF], capture_output=True)
+            logger.info("WireGuard on_install: removed old 10.8.0.x conf, will regenerate with 10.66.66.x")
+
+    # Generate initial wg0.conf only on first install (or after migration above)
     if not os.path.exists(WG_CONF):
         iface = _get_outbound_iface()
         priv = subprocess.run([WG_BIN, "genkey"], capture_output=True, text=True)
         privkey = priv.stdout.strip()
         conf = (
             "[Interface]\n"
-            "Address = 10.8.0.1/24\n"
+            "Address = 10.66.66.1/24\n"
             "ListenPort = 51820\n"
             f"PrivateKey = {privkey}\n"
             f"PostUp = sysctl -w net.ipv4.ip_forward=1; "

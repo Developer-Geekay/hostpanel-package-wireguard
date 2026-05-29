@@ -138,7 +138,7 @@ def _get_server_network() -> tuple:
                 return str(iface.ip), str(iface.network)
     except Exception:
         pass
-    return "10.8.0.1", "10.8.0.0/24"
+    return "10.66.66.1", "10.66.66.0/24"
 
 
 def _parse_peers_from_conf(conf: str) -> List[dict]:
@@ -612,12 +612,12 @@ async def get_peer_config(name: str, _: User = Depends(require_admin)):
     client_conf = (
         f"[Interface]\n"
         f"PrivateKey = {privkey}\n"
-        f"Address = {peer_ip}/32\n"
+        f"Address = {peer_ip}/24\n"
         f"DNS = 1.1.1.1\n\n"
         f"[Peer]\n"
         f"PublicKey = {_get_server_pubkey()}\n"
         f"Endpoint = {_get_server_endpoint()}\n"
-        f"AllowedIPs = 0.0.0.0/0\n"
+        f"AllowedIPs = 0.0.0.0/0, ::/0\n"
         f"PersistentKeepalive = 25\n"
     )
     return {"name": name, "config": client_conf}
