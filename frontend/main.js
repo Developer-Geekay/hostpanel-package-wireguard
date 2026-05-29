@@ -54,6 +54,18 @@
       .wg-spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: currentColor; border-radius: 50%; animation: spin .65s linear infinite; vertical-align: middle; }
       .wg-skel { background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%); background-size: 200% 100%; animation: wg-shimmer 1.5s infinite; border-radius: var(--radius-sm); height: 14px; }
       @keyframes wg-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+      .wg-setup-card { padding: 0 !important; overflow: hidden; }
+      .wg-setup-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; background: none; border: none; cursor: pointer; padding: 14px 18px; color: var(--text); font-size: 13px; font-weight: 500; font-family: var(--font-ui); }
+      .wg-setup-toggle:hover { background: var(--bg-2); }
+      .wg-setup-chevron { font-size: 18px; color: var(--text-3); transition: transform var(--transition); display: inline-block; }
+      .wg-setup-chevron-open { transform: rotate(90deg); }
+      .wg-setup-steps { padding: 4px 18px 18px; display: flex; flex-direction: column; gap: 16px; border-top: 1px solid var(--border); }
+      .wg-setup-step { display: flex; gap: 14px; align-items: flex-start; padding-top: 14px; }
+      .wg-setup-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-border); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+      .wg-setup-step-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+      .wg-setup-step-desc { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+      .wg-setup-link { font-size: 11px; padding: 2px 8px; border-radius: 3px; background: var(--bg-2); border: 1px solid var(--border); color: var(--accent); text-decoration: none; }
+      .wg-setup-link:hover { background: var(--accent-dim); border-color: var(--accent-border); }
       .wg-first-time-tip { font-size: 12px; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px; }
       .wg-no-config-note { font-size: 12px; color: var(--text-3); padding: 16px; text-align: center; }
       .field { margin-bottom: 14px; }
@@ -560,6 +572,65 @@
     `;
   }
 
+  // ── Client setup guide ───────────────────────────────────────────────────────
+
+  const SETUP_STEPS = [
+    {
+      icon: '1',
+      title: 'Install WireGuard',
+      desc: html`Download the WireGuard app for your device:
+        <span style=${{ display:'flex', flexWrap:'wrap', gap:6, marginTop:6 }}>
+          <a class="wg-setup-link" href="https://apps.apple.com/app/wireguard/id1441195209" target="_blank" rel="noopener">iOS App Store</a>
+          <a class="wg-setup-link" href="https://play.google.com/store/apps/details?id=com.wireguard.android" target="_blank" rel="noopener">Android Play Store</a>
+          <a class="wg-setup-link" href="https://www.wireguard.com/install/" target="_blank" rel="noopener">Windows / macOS / Linux</a>
+        </span>`,
+    },
+    {
+      icon: '2',
+      title: 'Add a peer',
+      desc: html`Click <strong>+ Add Peer</strong>, give it a name (e.g. <em>phone-ios</em>), and submit. The server generates a keypair and assigns a VPN IP automatically.`,
+    },
+    {
+      icon: '3',
+      title: 'Scan the QR code',
+      desc: html`A QR code appears immediately after adding. In your WireGuard app tap <strong>+</strong> → <em>Scan from QR code</em> and point your camera at it. On desktop, download the <code>.conf</code> file and import it instead.`,
+    },
+    {
+      icon: '4',
+      title: 'Connect',
+      desc: html`Toggle the tunnel on in the WireGuard app. The peer dot here turns green once the handshake completes (within ~30 seconds).`,
+    },
+  ];
+
+  function SetupGuide() {
+    const [open, setOpen] = useState(false);
+
+    return html`
+      <div class="card wg-setup-card" style=${{ marginBottom: 16 }}>
+        <button class="wg-setup-toggle" onClick=${() => setOpen(o => !o)}>
+          <span style=${{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style=${{ fontSize:15 }}>📱</span>
+            <span>How to connect a client device</span>
+          </span>
+          <span class=${'wg-setup-chevron' + (open ? ' wg-setup-chevron-open' : '')}>›</span>
+        </button>
+        ${open && html`
+          <div class="wg-setup-steps">
+            ${SETUP_STEPS.map((s, i) => html`
+              <div key=${i} class="wg-setup-step">
+                <div class="wg-setup-num">${s.icon}</div>
+                <div>
+                  <div class="wg-setup-step-title">${s.title}</div>
+                  <div class="wg-setup-step-desc">${s.desc}</div>
+                </div>
+              </div>
+            `)}
+          </div>
+        `}
+      </div>
+    `;
+  }
+
   // ── Server card ───────────────────────────────────────────────────────────────
 
   function ServerCard({ api }) {
@@ -661,10 +732,11 @@
         <div class="page-header">
           <div>
             <h1 class="page-title">WireGuard VPN</h1>
-            <p class="page-desc">Peer management &amp; key distribution</p>
+            <p class="page-desc">Peer management & key distribution</p>
           </div>
         </div>
         <${ServerCard} api=${api} />
+        <${SetupGuide} />
         <${PeerList} api=${api} />
       </div>
     `;

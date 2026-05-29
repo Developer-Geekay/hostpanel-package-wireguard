@@ -312,7 +312,8 @@ async def get_server_info(_: User = Depends(require_admin)):
 
 @router.get("/server/status", response_model=ServerStatus)
 async def get_server_status(_: User = Depends(require_admin)):
-    up = _run(["sudo", WG_BIN, "show", "wg0"], check=False).returncode == 0
+    # Use `ip link show wg0` — no sudo needed, reliable interface existence check
+    up = subprocess.run(["ip", "link", "show", "wg0"], capture_output=True).returncode == 0
     meta = _load_meta()
     if not up:
         return ServerStatus(up=False, peers_online=0, peers_total=len(meta))
