@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from deps import require_admin
 from auth import User
+from modules.audit.logger import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +348,7 @@ async def get_server_status(_: User = Depends(require_admin)):
 
 
 @router.post("/server/fix-routing")
-async def fix_routing(_: User = Depends(require_admin)):
+async def fix_routing(current_user: User = Depends(require_admin)):
     """Enable IP forwarding and update PostUp/PostDown to use the correct outbound interface."""
     iface = _get_outbound_iface()
 
@@ -380,6 +381,7 @@ async def fix_routing(_: User = Depends(require_admin)):
     # Restart service so new PostUp/PostDown take effect
     subprocess.run(["sudo", "systemctl", "restart", "hostpanel-wireguard"], capture_output=True)
 
+    log_action(current_user.username, "wireguard.fix_routing", "wg0", f"iface={iface}")
     return {
         "outbound_iface": iface,
         "ip_forward_enabled": True,
@@ -444,7 +446,7 @@ async def list_peers(_: User = Depends(require_admin)):
 
 
 @router.post("/peers")
-async def add_peer(request: PeerCreateRequest, _: User = Depends(require_admin)):
+async def add_peer(request: PeerCreateRequest, current_user: User = Depends(require_admin)):
     conf = _read_conf()
     if not conf:
         raise HTTPException(status_code=503, detail="WireGuard not configured")
@@ -469,12 +471,12 @@ async def add_peer(request: PeerCreateRequest, _: User = Depends(require_admin))
 
     meta[pubkey] = {"name": request.name, "allowed_ips": allowed_ips, "enabled": True, "imported": False}
     _save_meta(meta)
-
+    log_action(current_user.username, "wireguard.peer_add", request.name, f"ip={allowed_ips}")
     return {"name": request.name, "public_key": pubkey, "allowed_ips": allowed_ips}
 
 
 @router.post("/peers/import")
-async def import_peer(request: PeerImportRequest, _: User = Depends(require_admin)):
+async def import_peer(request: PeerImportRequest, current_user: User = Depends(require_admin)):
     """Register a peer using a client-provided public key (no private key stored server-side)."""
     conf = _read_conf()
     if not conf:
@@ -497,11 +499,12 @@ async def import_peer(request: PeerImportRequest, _: User = Depends(require_admi
         "imported": True,
     }
     _save_meta(meta)
+    log_action(current_user.username, "wireguard.peer_import", request.name, f"ip={allowed_ips}")
     return {"name": request.name, "public_key": request.public_key, "allowed_ips": allowed_ips}
 
 
 @router.delete("/peers/{name}")
-async def remove_peer(name: str, _: User = Depends(require_admin)):
+async def remove_peer(name: str, current_user: User = Depends(require_admin)):
     meta = _load_meta()
     pubkey = _find_pubkey_by_name(meta, name)
     if not pubkey:
@@ -520,11 +523,12 @@ async def remove_peer(name: str, _: User = Depends(require_admin)):
 
     meta.pop(pubkey, None)
     _save_meta(meta)
+    log_action(current_user.username, "wireguard.peer_remove", name)
     return {"message": f"Peer '{name}' removed"}
 
 
 @router.post("/peers/{name}/rename")
-async def rename_peer(name: str, request: PeerRenameRequest, _: User = Depends(require_admin)):
+async def rename_peer(name: str, request: PeerRenameRequest, current_user: User = Depends(require_admin)):
     meta = _load_meta()
     pubkey = _find_pubkey_by_name(meta, name)
     if not pubkey:
@@ -546,11 +550,12 @@ async def rename_peer(name: str, request: PeerRenameRequest, _: User = Depends(r
         info = {"name": new_name, "allowed_ips": None, "enabled": True, "imported": False}
     meta[pubkey] = info
     _save_meta(meta)
+    log_action(current_user.username, "wireguard.peer_rename", name, f"→ {new_name}")
     return {"name": new_name}
 
 
 @router.post("/peers/{name}/toggle")
-async def toggle_peer(name: str, request: PeerToggleRequest, _: User = Depends(require_admin)):
+async def toggle_peer(name: str, request: PeerToggleRequest, current_user: User = Depends(require_admin)):
     meta = _load_meta()
     pubkey = _find_pubkey_by_name(meta, name)
     if not pubkey:
@@ -580,6 +585,7 @@ async def toggle_peer(name: str, request: PeerToggleRequest, _: User = Depends(r
 
     meta[pubkey] = info
     _save_meta(meta)
+    log_action(current_user.username, "wireguard.peer_toggle", name, "enabled" if request.enabled else "disabled")
     return {"name": name, "enabled": request.enabled}
 
 
