@@ -32,9 +32,10 @@ PLUGIN_MANIFEST = {
 
 router = APIRouter(prefix="/cpanelapi/wireguard", tags=["WireGuard"])
 
-WG_CONF   = "/etc/wireguard/wg0.conf"
-PEERS_DIR = "/etc/wireguard/peers"
-WG_BIN    = "/opt/hostpanel/plugins/wireguard/wg"
+WG_DIR    = "/opt/hostpanel/plugins/wireguard"
+WG_CONF   = f"{WG_DIR}/wg0.conf"
+PEERS_DIR = f"{WG_DIR}/peers"
+WG_BIN    = f"{WG_DIR}/wg"
 
 # Cache public IP — avoid external call on every /server/info request
 _endpoint_cache: dict = {"ip": None, "ts": 0.0}

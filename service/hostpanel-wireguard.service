@@ -6,9 +6,9 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'PATH=/opt/hostpanel/plugins/wireguard:$PATH /opt/hostpanel/plugins/wireguard/wg-quick up wg0'
-ExecStop=/bin/sh -c 'PATH=/opt/hostpanel/plugins/wireguard:$PATH /opt/hostpanel/plugins/wireguard/wg-quick down wg0'
-ExecReload=/bin/sh -c 'PATH=/opt/hostpanel/plugins/wireguard:$PATH /opt/hostpanel/plugins/wireguard/wg syncconf wg0 /etc/wireguard/wg0.conf'
+ExecStart=/bin/sh -c 'PATH=/opt/hostpanel/plugins/wireguard:$PATH /opt/hostpanel/plugins/wireguard/wg-quick up /opt/hostpanel/plugins/wireguard/wg0.conf'
+ExecStop=/bin/sh -c 'PATH=/opt/hostpanel/plugins/wireguard:$PATH /opt/hostpanel/plugins/wireguard/wg-quick down /opt/hostpanel/plugins/wireguard/wg0.conf'
+ExecReload=/bin/sh -c 'PATH=/opt/hostpanel/plugins/wireguard:$PATH /opt/hostpanel/plugins/wireguard/wg syncconf wg0 /opt/hostpanel/plugins/wireguard/wg0.conf'
 
 [Install]
 WantedBy=multi-user.target
