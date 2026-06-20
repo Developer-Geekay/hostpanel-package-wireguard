@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="hostpanel-wireguard",
-    version="1.3.2",
+    version="1.3.3",
     packages=find_packages(),
     install_requires=["fastapi", "pydantic", "qrcode[pil]"],
     entry_points={
