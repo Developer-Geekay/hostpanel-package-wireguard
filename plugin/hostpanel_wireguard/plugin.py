@@ -1,5 +1,4 @@
 import ipaddress
-import json
 import logging
 import os
 import subprocess
@@ -33,10 +32,9 @@ PLUGIN_MANIFEST = {
 
 router = APIRouter(prefix="/cpanelapi/wireguard", tags=["WireGuard"])
 
-WG_CONF    = "/etc/wireguard/wg0.conf"
-PEERS_DIR  = "/etc/wireguard/peers"
-PEERS_META = "/opt/hostpanel/plugins/wireguard/peers.json"
-WG_BIN     = "/opt/hostpanel/plugins/wireguard/wg"
+WG_CONF   = "/etc/wireguard/wg0.conf"
+PEERS_DIR = "/etc/wireguard/peers"
+WG_BIN    = "/opt/hostpanel/plugins/wireguard/wg"
 
 # Cache public IP — avoid external call on every /server/info request
 _endpoint_cache: dict = {"ip": None, "ts": 0.0}
@@ -106,27 +104,66 @@ def _write_conf(content: str):
 
 
 def _load_meta() -> dict:
-    """Load peer metadata. Migrates old {pubkey: name_string} format to new {pubkey: {...}} format."""
+    """Load peer metadata from SQLite."""
+    from db import get_conn
     try:
-        if os.path.exists(PEERS_META):
-            with open(PEERS_META) as f:
-                raw = json.load(f)
-            migrated = {}
-            for k, v in raw.items():
-                if isinstance(v, str):
-                    migrated[k] = {"name": v, "allowed_ips": None, "enabled": True, "imported": False}
-                else:
-                    migrated[k] = v
-            return migrated
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT public_key, name, allowed_ips, enabled, imported, private_key FROM wg_peers"
+            ).fetchall()
+            return {
+                row["public_key"]: {
+                    "name": row["name"],
+                    "allowed_ips": row["allowed_ips"],
+                    "enabled": bool(row["enabled"]),
+                    "imported": bool(row["imported"]),
+                    "private_key": row["private_key"],
+                }
+                for row in rows
+            }
     except Exception:
-        pass
-    return {}
+        return {}
 
 
-def _save_meta(meta: dict):
-    os.makedirs(os.path.dirname(PEERS_META), exist_ok=True)
-    with open(PEERS_META, "w") as f:
-        json.dump(meta, f, indent=2)
+def _save_peer(pubkey: str, info: dict):
+    """Upsert a single peer in SQLite."""
+    from db import get_conn
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO wg_peers (public_key, name, allowed_ips, enabled, imported, private_key)
+               VALUES (?,?,?,?,?,?)
+               ON CONFLICT(public_key) DO UPDATE SET
+                 name=excluded.name, allowed_ips=excluded.allowed_ips,
+                 enabled=excluded.enabled, imported=excluded.imported,
+                 private_key=COALESCE(excluded.private_key, wg_peers.private_key)""",
+            (pubkey, info.get("name", pubkey[:8]), info.get("allowed_ips"),
+             int(info.get("enabled", True)), int(info.get("imported", False)),
+             info.get("private_key")),
+        )
+
+
+def _delete_peer(pubkey: str):
+    """Remove a peer from SQLite."""
+    from db import get_conn
+    with get_conn() as conn:
+        conn.execute("DELETE FROM wg_peers WHERE public_key=?", (pubkey,))
+
+
+def _sync_conf_from_db() -> int:
+    """Append any enabled DB peers missing from wg0.conf. Returns count of peers re-added."""
+    conf = _read_conf()
+    meta = _load_meta()
+    active = {p.get("PublicKey") for p in _parse_peers_from_conf(conf)}
+    new_conf = conf
+    added = 0
+    for pubkey, info in meta.items():
+        if pubkey not in active and info.get("enabled", True) and info.get("allowed_ips"):
+            new_conf += f"\n[Peer]\nPublicKey = {pubkey}\nAllowedIPs = {info['allowed_ips']}\n"
+            added += 1
+    if added:
+        _write_conf(new_conf)
+        subprocess.run(["sudo", "-n", "systemctl", "restart", "hostpanel-wireguard"], capture_output=True)
+    return added
 
 
 def _get_server_network() -> tuple:
@@ -390,6 +427,14 @@ async def fix_routing(current_user: User = Depends(require_admin)):
     }
 
 
+@router.post("/server/sync-peers")
+async def sync_peers_to_conf(current_user: User = Depends(require_admin)):
+    """Re-add any enabled peers from DB that are missing from wg0.conf (conf recovery)."""
+    added = _sync_conf_from_db()
+    log_action(current_user.username, "wireguard.sync_peers", "wg0", f"re-added={added}")
+    return {"ok": True, "re_added": added}
+
+
 @router.get("/server/config")
 async def export_server_config(_: User = Depends(require_admin)):
     conf = _read_conf()
@@ -428,17 +473,15 @@ async def list_peers(_: User = Depends(require_admin)):
             transfer_tx=s.get("transfer_tx"),
         ))
 
-    # Include disabled peers (in meta but not in conf)
+    # Include peers in meta that are not in conf (disabled or conf out of sync)
     for pubkey, info in meta.items():
         if pubkey in active_pubkeys or not isinstance(info, dict):
-            continue
-        if info.get("enabled", True):
             continue
         result.append(PeerInfo(
             name=info.get("name", pubkey[:8]),
             public_key=pubkey,
             allowed_ips=info.get("allowed_ips", ""),
-            enabled=False,
+            enabled=info.get("enabled", True),
             imported=info.get("imported", False),
         ))
 
@@ -469,8 +512,7 @@ async def add_peer(request: PeerCreateRequest, current_user: User = Depends(requ
     _write_conf(conf + peer_block)
     _run(["sudo", WG_BIN, "set", "wg0", "peer", pubkey, "allowed-ips", allowed_ips], check=False)
 
-    meta[pubkey] = {"name": request.name, "allowed_ips": allowed_ips, "enabled": True, "imported": False}
-    _save_meta(meta)
+    _save_peer(pubkey, {"name": request.name, "allowed_ips": allowed_ips, "enabled": True, "imported": False, "private_key": privkey})
     log_action(current_user.username, "wireguard.peer_add", request.name, f"ip={allowed_ips}")
     return {"name": request.name, "public_key": pubkey, "allowed_ips": allowed_ips}
 
@@ -492,13 +534,7 @@ async def import_peer(request: PeerImportRequest, current_user: User = Depends(r
     _write_conf(conf + peer_block)
     _run(["sudo", WG_BIN, "set", "wg0", "peer", request.public_key, "allowed-ips", allowed_ips], check=False)
 
-    meta[request.public_key] = {
-        "name": request.name,
-        "allowed_ips": allowed_ips,
-        "enabled": True,
-        "imported": True,
-    }
-    _save_meta(meta)
+    _save_peer(request.public_key, {"name": request.name, "allowed_ips": allowed_ips, "enabled": True, "imported": True})
     log_action(current_user.username, "wireguard.peer_import", request.name, f"ip={allowed_ips}")
     return {"name": request.name, "public_key": request.public_key, "allowed_ips": allowed_ips}
 
@@ -521,8 +557,7 @@ async def remove_peer(name: str, current_user: User = Depends(require_admin)):
     _run(["sudo", WG_BIN, "set", "wg0", "peer", pubkey, "remove"], check=False)
     _run(["sudo", "rm", "-f", os.path.join(PEERS_DIR, f"{name}.key")], check=False)
 
-    meta.pop(pubkey, None)
-    _save_meta(meta)
+    _delete_peer(pubkey)
     log_action(current_user.username, "wireguard.peer_remove", name)
     return {"message": f"Peer '{name}' removed"}
 
@@ -548,8 +583,7 @@ async def rename_peer(name: str, request: PeerRenameRequest, current_user: User 
         info["name"] = new_name
     else:
         info = {"name": new_name, "allowed_ips": None, "enabled": True, "imported": False}
-    meta[pubkey] = info
-    _save_meta(meta)
+    _save_peer(pubkey, info)
     log_action(current_user.username, "wireguard.peer_rename", name, f"→ {new_name}")
     return {"name": new_name}
 
@@ -583,8 +617,7 @@ async def toggle_peer(name: str, request: PeerToggleRequest, current_user: User 
         _run(["sudo", WG_BIN, "set", "wg0", "peer", pubkey, "remove"], check=False)
         info["enabled"] = False
 
-    meta[pubkey] = info
-    _save_meta(meta)
+    _save_peer(pubkey, info)
     log_action(current_user.username, "wireguard.peer_toggle", name, "enabled" if request.enabled else "disabled")
     return {"name": name, "enabled": request.enabled}
 
@@ -602,9 +635,12 @@ async def get_peer_config(name: str, _: User = Depends(require_admin)):
 
     key_file = os.path.join(PEERS_DIR, f"{name}.key")
     r = _run(["sudo", "cat", key_file], check=False)
-    if r.returncode != 0:
+    if r.returncode == 0:
+        privkey = r.stdout.strip()
+    elif isinstance(info, dict) and info.get("private_key"):
+        privkey = info["private_key"]
+    else:
         raise HTTPException(status_code=404, detail="Private key not found for this peer")
-    privkey = r.stdout.strip()
 
     conf = _read_conf()
     peer_in_conf = next((p for p in _parse_peers_from_conf(conf) if p.get("PublicKey") == pubkey), None)

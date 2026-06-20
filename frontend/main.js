@@ -638,6 +638,7 @@
     const { data: status, loading: statusLoading, refetch: refetchStatus } = useApi(() => api.get('server/status'), []);
     const [copied,  setCopied]  = useState(false);
     const [fixing,  setFixing]  = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     const handleCopyKey = () => {
       if (info?.public_key) {
@@ -667,6 +668,23 @@
         toast.err(e.message || 'Fix failed');
       } finally {
         setFixing(false);
+      }
+    };
+
+    const handleSync = async () => {
+      setSyncing(true);
+      try {
+        const r = await api.post('server/sync-peers', {});
+        if (r.re_added > 0) {
+          toast.ok(`Conf restored — ${r.re_added} peer(s) re-added to wg0.conf`);
+        } else {
+          toast.ok('All peers already present in conf — nothing to restore');
+        }
+        refetchStatus();
+      } catch (e) {
+        toast.err(e.message || 'Sync failed');
+      } finally {
+        setSyncing(false);
       }
     };
 
@@ -741,6 +759,9 @@
         `}
 
         <div class="wg-server-footer">
+          <button class="btn btn-ghost btn-sm" onClick=${handleSync} disabled=${syncing} title="Re-add peers from DB into wg0.conf (conf recovery)">
+            ${syncing ? html`<span class="wg-spin" /> Syncing…` : '⟳ Sync Peers to Conf'}
+          </button>
           <button class="btn btn-ghost btn-sm" onClick=${handleExport} title="Download wg0.conf">
             Export Server Config
           </button>
