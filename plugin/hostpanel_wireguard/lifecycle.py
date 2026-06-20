@@ -45,15 +45,18 @@ def on_install():
 
     _enable_ip_forward()
 
+    # /etc/wireguard is root-owned 700 — use sudo cat to check existence
+    existing_conf = subprocess.run(["sudo", "cat", WG_CONF], capture_output=True, text=True)
+    conf_present = existing_conf.returncode == 0
+
     # If conf exists but uses old 10.8.0.x subnet, remove it so it's regenerated
-    if os.path.exists(WG_CONF):
-        existing = subprocess.run(["sudo", "cat", WG_CONF], capture_output=True, text=True).stdout
-        if "10.8.0." in existing:
-            subprocess.run(["sudo", "rm", "-f", WG_CONF], capture_output=True)
-            logger.info("WireGuard on_install: removed old 10.8.0.x conf, will regenerate with 10.66.66.x")
+    if conf_present and "10.8.0." in existing_conf.stdout:
+        subprocess.run(["sudo", "rm", "-f", WG_CONF], capture_output=True)
+        conf_present = False
+        logger.info("WireGuard on_install: removed old 10.8.0.x conf, will regenerate with 10.66.66.x")
 
     # Generate initial wg0.conf only on first install (or after migration above)
-    if not os.path.exists(WG_CONF):
+    if not conf_present:
         iface = _get_outbound_iface()
         priv = subprocess.run([WG_BIN, "genkey"], capture_output=True, text=True)
         privkey = priv.stdout.strip()
@@ -91,6 +94,8 @@ def on_install():
     subprocess.run(["sudo", "systemctl", "start", SERVICE_NAME], capture_output=True)
     logger.info("WireGuard on_install: service enabled and started")
 
+    _sync_peers_to_conf()
+
 
 def pre_uninstall(force: bool = False):
     logger.info(f"WireGuard pre_uninstall: force={force}")
@@ -102,6 +107,17 @@ def pre_uninstall(force: bool = False):
         subprocess.run(["sudo", "rm", "-rf", WIREGUARD_DIR], capture_output=True)
     subprocess.run(["sudo", "rm", "-f", "/etc/sudoers.d/hostpanel-wireguard"], capture_output=True)
     logger.info("WireGuard pre_uninstall: complete")
+
+
+def _sync_peers_to_conf():
+    """Restore enabled DB peers missing from wg0.conf, then restart the service."""
+    try:
+        from hostpanel_wireguard.plugin import _sync_conf_from_db
+        added = _sync_conf_from_db()
+        if added:
+            logger.info(f"WireGuard lifecycle: re-added {added} peer(s) from DB to conf")
+    except Exception as e:
+        logger.warning(f"WireGuard lifecycle: peer sync failed: {e}")
 
 
 def on_startup():
@@ -116,3 +132,4 @@ def on_startup():
         subprocess.run(["sudo", "systemctl", "start", SERVICE_NAME], capture_output=True)
     else:
         logger.info("WireGuard on_startup: service is active")
+    _sync_peers_to_conf()
