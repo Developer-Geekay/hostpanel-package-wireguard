@@ -22,32 +22,8 @@
     const s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent = `
-      .wg-server-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 14px; }
-      .wg-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); margin-bottom: 4px; }
-      .wg-stat-val { font-family: var(--font-mono); font-size: 12px; word-break: break-all; color: var(--text); display: flex; align-items: center; gap: 6px; }
-      .wg-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; }
-      .wg-status-up { background: rgba(34,197,94,.12); color: #22c55e; }
-      .wg-status-down { background: var(--bg-2); color: var(--text-3); border: 1px solid var(--border); }
-      .wg-server-footer { display: flex; justify-content: flex-end; margin-top: 6px; gap: 6px; }
-      .wg-peers-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
-      .wg-peers-btns { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-      .wg-peer-list { display: flex; flex-direction: column; gap: 6px; }
-      .wg-peer-row { display: grid; grid-template-columns: 10px 1fr auto; align-items: start; gap: 12px; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; transition: border-color var(--transition); }
-      .wg-peer-row:hover { border-color: var(--accent-border); }
-      .wg-peer-row.wg-disabled { opacity: .5; }
-      .wg-peer-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
-      .wg-peer-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; font-family: var(--font-mono); color: var(--text-2); margin-top: 2px; }
-      .wg-peer-ip { color: var(--accent); }
-      .wg-peer-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-      .wg-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--bg-2); color: var(--text-3); border: 1px solid var(--border); }
-      .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
-      .dot-ok { background: #22c55e; box-shadow: 0 0 5px #22c55e66; }
-      .dot-dim { background: var(--text-3); }
       .wg-copy-btn { background: none; border: none; cursor: pointer; color: var(--text-3); padding: 2px 4px; border-radius: 3px; font-size: 10px; line-height: 1; }
       .wg-copy-btn:hover { color: var(--accent); background: var(--accent-dim); }
-      .wg-tab-row { display: flex; gap: 6px; margin-bottom: 14px; }
-      .wg-tab { padding: 5px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text-2); font-family: var(--font-ui); font-size: 12px; cursor: pointer; transition: all var(--transition); }
-      .wg-tab-active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border); }
       .wg-qr-img { display: block; margin: 0 auto; max-width: 220px; width: 100%; border-radius: var(--radius-sm); image-rendering: pixelated; }
       .wg-conf-pre { font-family: var(--font-mono); font-size: 11px; color: var(--text-2); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; white-space: pre; overflow-x: auto; max-height: 220px; overflow-y: auto; margin: 0; }
       .wg-modal-dl { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; flex-wrap: wrap; }
@@ -68,11 +44,6 @@
       .wg-setup-link:hover { background: var(--accent-dim); border-color: var(--accent-border); }
       .wg-first-time-tip { font-size: 12px; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px; }
       .wg-no-config-note { font-size: 12px; color: var(--text-3); padding: 16px; text-align: center; }
-      .field { margin-bottom: 14px; }
-      .field label { display: block; font-size: 11px; font-weight: 500; color: var(--text-2); margin-bottom: 5px; }
-      .field input, .field textarea { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 7px 10px; color: var(--text); font-family: var(--font-mono); font-size: 12px; outline: none; transition: border-color var(--transition); }
-      .field input:focus, .field textarea:focus { border-color: var(--accent-border); }
-      .field textarea { resize: vertical; min-height: 64px; }
     `;
     document.head.appendChild(s);
   }
@@ -89,6 +60,7 @@
     return n.toFixed(i ? 1 : 0) + ' ' + units[i];
   }
 
+  // formats epoch handshake time
   function formatHandshake(epoch) {
     if (!epoch || epoch === '0') return 'Never';
     const secs = Date.now() / 1000 - parseInt(epoch, 10);
@@ -180,9 +152,9 @@
         ${noConfig
           ? html`<p class="wg-no-config-note">No config available — this peer uses a client-generated key.</p>`
           : html`
-            <div class="wg-tab-row">
-              <button class=${'wg-tab' + (tab === 'qr'   ? ' wg-tab-active' : '')} onClick=${() => setTab('qr')}>QR Code</button>
-              <button class=${'wg-tab' + (tab === 'conf' ? ' wg-tab-active' : '')} onClick=${() => setTab('conf')}>Config File</button>
+            <div class="tab-bar" style=${{ padding: 0, marginBottom: 12 }}>
+              <button class=${'tab' + (tab === 'qr'   ? ' active' : '')} onClick=${() => setTab('qr')}>QR Code</button>
+              <button class=${'tab' + (tab === 'conf' ? ' active' : '')} onClick=${() => setTab('conf')}>Config File</button>
             </div>
 
             ${loading
@@ -220,111 +192,6 @@
     `;
   }
 
-  // ── Add Peer modal ───────────────────────────────────────────────────────────
-
-  function AddModal({ api, onClose, onAdded }) {
-    const [name, setName]   = useState('');
-    const [ip, setIp]       = useState('');
-    const [busy, setBusy]   = useState(false);
-    const [err, setErr]     = useState('');
-
-    const submit = async () => {
-      if (!name.trim()) return;
-      setBusy(true); setErr('');
-      try {
-        const body = { name: name.trim() };
-        if (ip.trim()) body.allowed_ips = ip.trim();
-        await api.post('peers', body);
-        onAdded(name.trim());
-      } catch (e) {
-        setErr(e.message || 'Failed to add peer');
-        setBusy(false);
-      }
-    };
-
-    return html`
-      <${WgModal}
-        title="Add Peer"
-        onClose=${onClose}
-        footer=${html`
-          <button class="btn btn-outline btn-md" onClick=${onClose} disabled=${busy}>Cancel</button>
-          <button class="btn btn-primary btn-md" onClick=${submit} disabled=${busy || !name.trim()}>
-            ${busy ? html`<span class="wg-spin" /> Adding…` : 'Add Peer'}
-          </button>
-        `}
-      >
-        <div class="field">
-          <label>Peer name</label>
-          <input type="text" value=${name} onInput=${e => setName(e.target.value)}
-            onKeyDown=${e => e.key === 'Enter' && submit()}
-            placeholder="e.g. laptop, phone-ios" autoFocus />
-        </div>
-        <div class="field" style=${{ marginBottom: 0 }}>
-          <label>VPN IP <span style=${{ color: 'var(--text-3)', fontWeight: 400 }}>(optional — auto-assigned if blank)</span></label>
-          <input type="text" value=${ip} onInput=${e => setIp(e.target.value)} placeholder="10.8.0.x/32" />
-        </div>
-        ${err && html`<p style=${{ color: 'var(--err)', fontSize: 12, marginTop: 10 }}>${err}</p>`}
-      </${WgModal}>
-    `;
-  }
-
-  // ── Import Peer modal (client-generated key) ─────────────────────────────────
-
-  function ImportModal({ api, onClose, onDone }) {
-    const [name, setName]     = useState('');
-    const [pubkey, setPubkey] = useState('');
-    const [ip, setIp]         = useState('');
-    const [busy, setBusy]     = useState(false);
-    const [err, setErr]       = useState('');
-
-    const submit = async () => {
-      if (!name.trim() || !pubkey.trim()) return;
-      setBusy(true); setErr('');
-      try {
-        const body = { name: name.trim(), public_key: pubkey.trim() };
-        if (ip.trim()) body.allowed_ips = ip.trim();
-        await api.post('peers/import', body);
-        onDone();
-      } catch (e) {
-        setErr(e.message || 'Failed to import peer');
-        setBusy(false);
-      }
-    };
-
-    return html`
-      <${WgModal}
-        title="Import Peer (Client Key)"
-        width=${440}
-        onClose=${onClose}
-        footer=${html`
-          <button class="btn btn-outline btn-md" onClick=${onClose} disabled=${busy}>Cancel</button>
-          <button class="btn btn-primary btn-md" onClick=${submit} disabled=${busy || !name.trim() || !pubkey.trim()}>
-            ${busy ? html`<span class="wg-spin" /> Importing…` : 'Import Peer'}
-          </button>
-        `}
-      >
-        <p style=${{ fontSize: 12, color: 'var(--text-2)', marginBottom: 14, marginTop: 0, lineHeight: 1.6 }}>
-          Use this when your device has its own WireGuard keypair.
-          Paste the device's <strong>public key</strong> — the private key stays on your device.
-        </p>
-        <div class="field">
-          <label>Peer name</label>
-          <input type="text" value=${name} onInput=${e => setName(e.target.value)} placeholder="e.g. router, desktop" autoFocus />
-        </div>
-        <div class="field">
-          <label>Public key</label>
-          <textarea value=${pubkey} onInput=${e => setPubkey(e.target.value)}
-            placeholder="wg pubkey output (44 chars, base64)" style=${{ fontFamily: 'var(--font-mono)', fontSize: 11 }} />
-        </div>
-        <div class="field" style=${{ marginBottom: 0 }}>
-          <label>VPN IP <span style=${{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span></label>
-          <input type="text" value=${ip} onInput=${e => setIp(e.target.value)} placeholder="10.8.0.x/32" />
-        </div>
-        ${err && html`<p style=${{ color: 'var(--err)', fontSize: 12, marginTop: 10 }}>${err}</p>`}
-      </${WgModal}>
-    `;
-  }
-
   // ── Rename modal ─────────────────────────────────────────────────────────────
 
   function RenameModal({ name, api, onClose, onDone }) {
@@ -358,7 +225,7 @@
       >
         <div class="field" style=${{ marginBottom: 0 }}>
           <label>New name</label>
-          <input type="text" value=${newName} onInput=${e => setNewName(e.target.value)}
+          <input type="text" class="input" value=${newName} onInput=${e => setNewName(e.target.value)}
             onKeyDown=${e => e.key === 'Enter' && submit()} autoFocus />
         </div>
         ${err && html`<p style=${{ color: 'var(--err)', fontSize: 12, marginTop: 10 }}>${err}</p>`}
@@ -366,99 +233,112 @@
     `;
   }
 
-  // ── Peer row ─────────────────────────────────────────────────────────────────
+  // ── Sidebar creation forms ────────────────────────────────────────────────────
 
-  function PeerRow({ peer, onQr, onDelete, onRename, onToggle, toggling }) {
-    const online = isOnline(peer);
+  function CreatePeerPanel({ api, onAdded, onImportDone }) {
+    const [createTab, setCreateTab] = useState('add');
+
+    // Add form state
+    const [name, setName] = useState('');
+    const [ip, setIp]     = useState('');
+    const [addBusy, setAddBusy] = useState(false);
+    const [addErr, setAddErr]   = useState('');
+
+    // Import form state
+    const [importName, setImportName] = useState('');
+    const [importPubkey, setImportPubkey] = useState('');
+    const [importIp, setImportIp]     = useState('');
+    const [importBusy, setImportBusy] = useState(false);
+    const [importErr, setImportErr]   = useState('');
+
+    const handleAddSubmit = async (e) => {
+      e.preventDefault();
+      if (!name.trim()) return;
+      setAddBusy(true); setAddErr('');
+      try {
+        const body = { name: name.trim() };
+        if (ip.trim()) body.allowed_ips = ip.trim();
+        await api.post('peers', body);
+        onAdded(name.trim());
+        setName(''); setIp('');
+      } catch (err) {
+        setAddErr(err.message || 'Failed to add peer');
+      } finally {
+        setAddBusy(false);
+      }
+    };
+
+    const handleImportSubmit = async (e) => {
+      e.preventDefault();
+      if (!importName.trim() || !importPubkey.trim()) return;
+      setImportBusy(true); setImportErr('');
+      try {
+        const body = { name: importName.trim(), public_key: importPubkey.trim() };
+        if (importIp.trim()) body.allowed_ips = importIp.trim();
+        await api.post('peers/import', body);
+        onImportDone(importName.trim());
+        setImportName(''); setImportPubkey(''); setImportIp('');
+      } catch (err) {
+        setImportErr(err.message || 'Failed to import peer');
+      } finally {
+        setImportBusy(false);
+      }
+    };
+
     return html`
-      <div class=${'wg-peer-row' + (peer.enabled ? '' : ' wg-disabled')}>
-        <span class=${'dot ' + (online ? 'dot-ok' : 'dot-dim')} />
-        <div>
-          <div class="wg-peer-name">
-            ${peer.name}
-            ${peer.imported && html`<span class="wg-badge">imported</span>`}
-            ${!peer.enabled && html`<span class="wg-badge">disabled</span>`}
-          </div>
-          <div class="wg-peer-meta">
-            <span class="wg-peer-ip">${peer.allowed_ips}</span>
-            <span>${formatHandshake(peer.last_handshake)}</span>
-            ${peer.transfer_rx != null && html`<span>↓ ${formatBytes(peer.transfer_rx)}</span>`}
-            ${peer.transfer_tx != null && html`<span>↑ ${formatBytes(peer.transfer_tx)}</span>`}
-          </div>
+      <div class="split-left" style=${{ width: 320, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <span class="section-label">Create Peer</span>
+        
+        <div class="tab-bar" style=${{ padding: 0, marginBottom: 12 }}>
+          <div class=${'tab ' + (createTab === 'add' ? 'active' : '')} onClick=${() => setCreateTab('add')}>Add New</div>
+          <div class=${'tab ' + (createTab === 'import' ? 'active' : '')} onClick=${() => setCreateTab('import')}>Import Key</div>
         </div>
-        <div class="wg-peer-actions">
-          <button class="btn btn-ghost btn-sm"
-            onClick=${() => onToggle(peer.name, !peer.enabled)}
-            disabled=${toggling === peer.name}
-            title=${peer.enabled ? 'Disable peer' : 'Enable peer'}>
-            ${toggling === peer.name
-              ? html`<span class="wg-spin" />`
-              : peer.enabled ? 'Disable' : 'Enable'
-            }
-          </button>
-          ${!peer.imported && html`
-            <button class="btn btn-ghost btn-sm" onClick=${() => onQr(peer.name)} title="Show QR / Config">QR</button>
-          `}
-          <button class="btn btn-ghost btn-sm" onClick=${() => onRename(peer.name)} title="Rename">Rename</button>
-          <button class="btn btn-danger btn-sm" onClick=${() => onDelete(peer.name)} title="Remove peer">Remove</button>
-        </div>
+
+        ${createTab === 'add' ? html`
+          <form onSubmit=${handleAddSubmit} style=${{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div class="field">
+              <label>Peer name</label>
+              <input type="text" class="input" value=${name} onInput=${e => setName(e.target.value)} placeholder="e.g. phone-ios" required />
+            </div>
+            <div class="field">
+              <label>VPN IP Address <span style=${{ textTransform: 'lowercase', opacity: 0.7 }}>(optional)</span></label>
+              <input type="text" class="input" value=${ip} onInput=${e => setIp(e.target.value)} placeholder="e.g. 10.8.0.2/32" />
+            </div>
+            ${addErr && html`<p style=${{ color: 'var(--err)', fontSize: 12, marginTop: 4 }}>${addErr}</p>`}
+            <button type="submit" class="btn btn-primary btn-sm" disabled=${addBusy || !name.trim()}>
+              ${addBusy ? 'Adding Peer…' : 'Add Peer'}
+            </button>
+          </form>
+        ` : html`
+          <form onSubmit=${handleImportSubmit} style=${{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div class="field">
+              <label>Peer name</label>
+              <input type="text" class="input" value=${importName} onInput=${e => setImportName(e.target.value)} placeholder="e.g. router" required />
+            </div>
+            <div class="field">
+              <label>Public Key</label>
+              <textarea class="input" value=${importPubkey} onInput=${e => setImportPubkey(e.target.value)} placeholder="wg public key (base64)" required style=${{ height: 60, fontFamily: 'var(--font-mono)', fontSize: 11 }} />
+            </div>
+            <div class="field">
+              <label>VPN IP Address <span style=${{ textTransform: 'lowercase', opacity: 0.7 }}>(optional)</span></label>
+              <input type="text" class="input" value=${importIp} onInput=${e => setImportIp(e.target.value)} placeholder="e.g. 10.8.0.3/32" />
+            </div>
+            ${importErr && html`<p style=${{ color: 'var(--err)', fontSize: 12, marginTop: 4 }}>${importErr}</p>`}
+            <button type="submit" class="btn btn-primary btn-sm" disabled=${importBusy || !importName.trim() || !importPubkey.trim()}>
+              ${importBusy ? 'Importing…' : 'Import Peer'}
+            </button>
+          </form>
+        `}
       </div>
     `;
   }
 
-  // ── Peer list ─────────────────────────────────────────────────────────────────
+  // ── Peer list table ───────────────────────────────────────────────────────────
 
-  function PeerList({ api }) {
+  function PeerListTable({ api, peers, refreshing, fetchPeers, toggling, setToggling, onShowConfig }) {
     const { toast } = useToast();
-    const [peers, setPeers]           = useState(null);
-    const [refreshing, setRefreshing] = useState(false);
-    const [addOpen, setAddOpen]       = useState(false);
-    const [importOpen, setImportOpen] = useState(false);
-    const [qrTarget, setQrTarget]     = useState(null);
-    const [qrIsNew, setQrIsNew]       = useState(false);
     const [deleteTarget, setDelTarget] = useState(null);
     const [renameTarget, setRenameTarget] = useState(null);
-    const [toggling, setToggling]     = useState(null);
-    const timerRef = useRef(null);
-
-    const fetchPeers = useCallback(async (silent = false) => {
-      if (!silent) setRefreshing(true);
-      try {
-        const data = await api.get('peers');
-        setPeers(data);
-      } catch (e) {
-        if (!silent) toast.err(e.message || 'Failed to load peers');
-        if (peers === null) setPeers([]);
-      } finally {
-        if (!silent) setRefreshing(false);
-      }
-    }, [api]);
-
-    // Initial load + 30s auto-refresh
-    useEffect(() => {
-      fetchPeers();
-      timerRef.current = setInterval(() => fetchPeers(true), 30000);
-      return () => clearInterval(timerRef.current);
-    }, [fetchPeers]);
-
-    const handleAdded = (name) => {
-      setAddOpen(false);
-      setQrTarget(name);
-      setQrIsNew(true);
-      fetchPeers(true);
-      toast.ok('Peer "' + name + '" added');
-    };
-
-    const handleImportDone = () => {
-      setImportOpen(false);
-      fetchPeers(true);
-      toast.ok('Peer imported');
-    };
-
-    const handleQrClose = () => {
-      setQrTarget(null);
-      setQrIsNew(false);
-    };
 
     const handleDelete = async (name) => {
       try {
@@ -471,7 +351,7 @@
       }
     };
 
-    const handleRename = async (oldName, newName) => {
+    const handleRename = async (newName) => {
       setRenameTarget(null);
       fetchPeers(true);
       toast.ok('Renamed to "' + newName + '"');
@@ -492,69 +372,98 @@
 
     return html`
       <div class="card">
-        <div class="wg-peers-head">
+        <div style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
           <div class="card-title" style=${{ margin: 0 }}>VPN Peers</div>
-          <div class="wg-peers-btns">
-            <button class="btn btn-ghost btn-sm" onClick=${() => fetchPeers()} disabled=${refreshing} title="Refresh">
-              ${refreshing ? html`<span class="wg-spin" />` : '⟳'} Refresh
-            </button>
-            <button class="btn btn-ghost btn-sm" onClick=${() => setImportOpen(true)}>Import Peer</button>
-            <button class="btn btn-primary btn-sm" onClick=${() => setAddOpen(true)}>+ Add Peer</button>
-          </div>
+          <button class="btn btn-ghost btn-sm" onClick=${() => fetchPeers()} disabled=${refreshing} title="Refresh">
+            ${refreshing ? html`<span class="wg-spin" />` : '⟳'} Refresh
+          </button>
         </div>
 
-        <div class="wg-peer-list">
-          ${peers === null
-            ? [0,1,2].map(i => html`
-                <div key=${i} class="wg-peer-row" style=${{ pointerEvents: 'none' }}>
-                  <span class="dot dot-dim" />
-                  <div>
-                    <div class="wg-skel" style=${{ width: 110, marginBottom: 8 }} />
-                    <div class="wg-skel" style=${{ width: '65%' }} />
-                  </div>
-                  <div />
-                </div>
-              `)
-            : peers.length === 0
-              ? html`
-                  <div class="empty">
-                    <div class="empty-icon">🔒</div>
-                    <div class="empty-title">No peers yet</div>
-                    <div class="empty-desc">Add your first VPN peer to get started.</div>
-                  </div>
-                `
-              : peers.map(peer => html`
-                  <${PeerRow}
-                    key=${peer.public_key}
-                    peer=${peer}
-                    onQr=${setQrTarget}
-                    onDelete=${setDelTarget}
-                    onRename=${setRenameTarget}
-                    onToggle=${handleToggle}
-                    toggling=${toggling}
-                  />
-                `)
-          }
+        <div class="table-wrap">
+          <table style=${{ tableLayout: 'fixed', width: '100%', minWidth: '960px' }}>
+            <thead>
+              <tr>
+                <th style=${{ width: 60, textAlign: 'center' }}>Status</th>
+                <th>Name</th>
+                <th style=${{ width: 130 }}>VPN IP</th>
+                <th style=${{ width: 110 }}>Last Active</th>
+                <th style=${{ width: 95 }}>Received</th>
+                <th style=${{ width: 95 }}>Sent</th>
+                <th style=${{ width: 260, textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${peers === null
+                ? [0,1,2].map(i => html`
+                    <tr key=${i}>
+                      <td style=${{ textAlign: 'center' }}><span class="dot dot-dim" /></td>
+                      <td><div class="wg-skel" style=${{ width: 100 }} /></td>
+                      <td><div class="wg-skel" style=${{ width: 80 }} /></td>
+                      <td><div class="wg-skel" style=${{ width: 60 }} /></td>
+                      <td><div class="wg-skel" style=${{ width: 50 }} /></td>
+                      <td><div class="wg-skel" style=${{ width: 50 }} /></td>
+                      <td></td>
+                    </tr>
+                  `)
+                : peers.length === 0
+                  ? html`
+                      <tr>
+                        <td colSpan="7">
+                          <div class="empty">
+                            <div class="empty-icon">🔒</div>
+                            <div class="empty-title">No peers yet</div>
+                            <div class="empty-desc">Create your first VPN peer in the left sidebar to connect a device.</div>
+                          </div>
+                        </td>
+                      </tr>
+                    `
+                  : peers.map(peer => {
+                      const online = isOnline(peer);
+                      return html`
+                        <tr key=${peer.public_key} style=${{ opacity: peer.enabled ? 1 : 0.55 }}>
+                          <td style=${{ textAlign: 'center' }}>
+                            <span class=${'dot ' + (online ? 'dot-ok' : 'dot-dim')} style=${{ display: 'inline-block', margin: '0 auto' }} />
+                          </td>
+                          <td>
+                            <div style=${{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style=${{ fontWeight: 500, color: 'var(--text)' }}>${peer.name}</span>
+                              ${peer.imported && html`<span class="chip chip-gray" style=${{ padding: '0 6px', fontSize: 10 }}>imported</span>`}
+                              ${!peer.enabled && html`<span class="chip chip-red" style=${{ padding: '0 6px', fontSize: 10 }}>disabled</span>`}
+                            </div>
+                          </td>
+                          <td class="mono" style=${{ color: 'var(--accent)', fontSize: 12.5 }}>${peer.allowed_ips}</td>
+                          <td style=${{ color: 'var(--text-2)', fontSize: 12 }}>${formatHandshake(peer.last_handshake)}</td>
+                          <td class="mono" style=${{ color: 'var(--text-2)', fontSize: 12 }}>${peer.transfer_rx != null ? formatBytes(peer.transfer_rx) : '—'}</td>
+                          <td class="mono" style=${{ color: 'var(--text-2)', fontSize: 12 }}>${peer.transfer_tx != null ? formatBytes(peer.transfer_tx) : '—'}</td>
+                          <td style=${{ textAlign: 'right' }}>
+                            <div style=${{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                              <button class="btn btn-ghost btn-xs"
+                                onClick=${() => handleToggle(peer.name, !peer.enabled)}
+                                disabled=${toggling === peer.name}
+                              >
+                                ${toggling === peer.name ? '…' : peer.enabled ? 'Disable' : 'Enable'}
+                              </button>
+                              ${!peer.imported && html`
+                                <button class="btn btn-ghost btn-xs" onClick=${() => onShowConfig(peer.name)}>Config</button>
+                              `}
+                              <button class="btn btn-ghost btn-xs" onClick=${() => setRenameTarget(peer.name)}>Rename</button>
+                              <button class="btn btn-danger btn-xs" onClick=${() => setDelTarget(peer.name)}>Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      `;
+                    })
+              }
+            </tbody>
+          </table>
         </div>
-
-        ${addOpen && html`
-          <${AddModal} api=${api} onClose=${() => setAddOpen(false)} onAdded=${handleAdded} />
-        `}
-
-        ${importOpen && html`
-          <${ImportModal} api=${api} onClose=${() => setImportOpen(false)} onDone=${handleImportDone} />
-        `}
-
-        ${qrTarget && html`
-          <${QRModal} name=${qrTarget} api=${api} isNew=${qrIsNew} onClose=${handleQrClose} />
-        `}
 
         ${renameTarget && html`
           <${RenameModal}
             name=${renameTarget}
             api=${api}
             onClose=${() => setRenameTarget(null)}
-            onDone=${(newName) => handleRename(renameTarget, newName)}
+            onDone=${handleRename}
           />
         `}
 
@@ -588,17 +497,17 @@
     {
       icon: '2',
       title: 'Add a peer',
-      desc: html`Click <strong>+ Add Peer</strong>, give it a name (e.g. <em>phone-ios</em>), and submit. The server generates a keypair and assigns a VPN IP automatically.`,
+      desc: html`Use the left sidebar panel to add a peer name. The server will auto-assign its VPN IP address.`,
     },
     {
       icon: '3',
-      title: 'Scan the QR code',
-      desc: html`A QR code appears immediately after adding. In your WireGuard app tap <strong>+</strong> → <em>Scan from QR code</em> and point your camera at it. On desktop, download the <code>.conf</code> file and import it instead.`,
+      title: 'Scan the QR code / Import Config',
+      desc: html`An interactive config popup will appear immediately. In your WireGuard app, scan the QR code using your camera, or import/download the generated <code>.conf</code> file.`,
     },
     {
       icon: '4',
       title: 'Connect',
-      desc: html`Toggle the tunnel on in the WireGuard app. The peer dot here turns green once the handshake completes (within ~30 seconds).`,
+      desc: html`Toggle the tunnel on. The peer status turns green once the handshake completes (within ~30 seconds).`,
     },
   ];
 
@@ -639,6 +548,7 @@
     const [copied,  setCopied]  = useState(false);
     const [fixing,  setFixing]  = useState(false);
     const [syncing, setSyncing] = useState(false);
+    const { toast } = useToast();
 
     const handleCopyKey = () => {
       if (info?.public_key) {
@@ -692,75 +602,75 @@
     const ipFwd = status?.ip_forward;
     const loading = infoLoading || statusLoading;
 
-    const fields = [
-      { key: 'endpoint',   label: 'Endpoint' },
-      { key: 'address',    label: 'Interface IP' },
-      { key: 'port',       label: 'Port' },
-    ];
-
     return html`
-      <div class="card" style=${{ marginBottom: 16 }}>
-        <div style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-          <div class="card-title" style=${{ margin: 0 }}>Server</div>
-          ${loading
-            ? html`<div class="wg-skel" style=${{ width: 72, height: 22 }} />`
-            : html`
-                <span class=${'wg-status-badge ' + (up ? 'wg-status-up' : 'wg-status-down')}>
-                  ${up ? '● Online' : '○ Offline'}
-                  ${status && html` · ${status.peers_online}/${status.peers_total} peers`}
-                </span>
-              `
-          }
-        </div>
-
-        <div class="wg-server-grid">
-          ${fields.map(({ key, label }) => html`
-            <div key=${key}>
-              <div class="wg-stat-label">${label}</div>
-              <div class="wg-stat-val">
-                ${loading
-                  ? html`<div class="wg-skel" style=${{ width: '70%' }} />`
-                  : html`${info?.[key] ?? '—'}`
-                }
-              </div>
+      <div>
+        <div class="stat-grid-4" style=${{ marginBottom: 16 }}>
+          <!-- Status Card -->
+          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div class="stat-lbl">Status</div>
+            <div class="stat-val" style=${{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, marginBottom: 0 }}>
+              <span class=${'dot ' + (up ? 'dot-ok' : 'dot-dim')} style=${{ flexShrink: 0 }} />
+              <span style=${{ textTransform: 'capitalize' }}>${loading ? 'Loading…' : up ? 'online' : 'offline'}</span>
             </div>
-          `)}
-          <div>
-            <div class="wg-stat-label">Public Key</div>
-            <div class="wg-stat-val" style=${{ alignItems: 'flex-start' }}>
-              ${loading
-                ? html`<div class="wg-skel" style=${{ width: '90%' }} />`
-                : html`
-                    <span style=${{ flex: 1, wordBreak: 'break-all' }}>${info?.public_key ?? '—'}</span>
-                    ${info?.public_key && html`
-                      <button class="wg-copy-btn" onClick=${handleCopyKey} title="Copy public key">
-                        ${copied ? '✓' : '⎘'}
-                      </button>
-                    `}
-                  `
-              }
+            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+              ${status ? status.peers_online + ' / ' + status.peers_total + ' peers active' : '—'}
+            </div>
+          </div>
+
+          <!-- Endpoint Card -->
+          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div class="stat-lbl">Endpoint</div>
+            <div class="stat-val" style=${{ fontSize: 16, fontFamily: 'var(--font-mono)', marginBottom: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              ${loading ? '—' : info?.endpoint ?? '—'}
+            </div>
+            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+              Port ${info?.port ?? '—'}
+            </div>
+          </div>
+
+          <!-- Interface IP Card -->
+          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div class="stat-lbl">Interface IP</div>
+            <div class="stat-val" style=${{ fontSize: 16, fontFamily: 'var(--font-mono)', marginBottom: 0 }}>
+              ${loading ? '—' : info?.address ?? '—'}
+            </div>
+            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+              IPv4 Tunnel
+            </div>
+          </div>
+
+          <!-- Public Key Card -->
+          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
+            <div class="stat-lbl" style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Public Key</span>
+              ${info?.public_key && html`
+                <button class="wg-copy-btn" onClick=${handleCopyKey} title="Copy public key">
+                  ${copied ? '✓' : '⎘'}
+                </button>
+              `}
+            </div>
+            <div class="stat-val mono" style=${{ fontSize: 12, wordBreak: 'break-all', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0 }} title=${info?.public_key}>
+              ${loading ? '—' : info?.public_key ?? '—'}
+            </div>
+            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+              Server identity
             </div>
           </div>
         </div>
 
         ${!loading && up && ipFwd === false && html`
-          <div style=${{
-            margin: '10px 0 6px', padding: '10px 12px',
-            background: 'rgba(234,179,8,.1)', color: '#ca8a04',
-            border: '1px solid rgba(234,179,8,.25)', borderRadius: 'var(--radius-sm)',
-            fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          }}>
-            <span>⚠ IP forwarding is disabled — peers cannot route internet traffic through this VPN.</span>
-            <button class="btn btn-sm" style=${{ background: '#ca8a04', color: '#fff', border: 'none', flexShrink: 0 }}
+          <div class="inline-alert alert-amber animate-fade-in" style=${{ marginBottom: 16 }}>
+            <span style=${{ flex: 1 }}>⚠ IP forwarding is disabled — peers cannot route internet traffic through this VPN.</span>
+            <button class="btn btn-success btn-xs" style=${{ flexShrink: 0 }}
               onClick=${handleFixRouting} disabled=${fixing}>
               ${fixing ? html`<span class="wg-spin" /> Fixing…` : 'Fix Now'}
             </button>
           </div>
         `}
 
-        <div class="wg-server-footer">
-          <button class="btn btn-ghost btn-sm" onClick=${handleSync} disabled=${syncing} title="Re-add peers from DB into wg0.conf (conf recovery)">
-            ${syncing ? html`<span class="wg-spin" /> Syncing…` : '⟳ Sync Peers to Conf'}
+        <div style=${{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+          <button class="btn btn-ghost btn-sm" onClick=${handleSync} disabled=${syncing} title="Re-add peers from DB into wg0.conf">
+            ${syncing ? 'Syncing Conf…' : 'Sync Peers to Conf'}
           </button>
           <button class="btn btn-ghost btn-sm" onClick=${handleExport} title="Download wg0.conf">
             Export Server Config
@@ -773,22 +683,81 @@
   // ── Root app ──────────────────────────────────────────────────────────────────
 
   function WireGuardApp({ api }) {
+    const { toast } = useToast();
+    const [peers, setPeers]           = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [toggling, setToggling]     = useState(null);
+
+    const [qrTarget, setQrTarget] = useState(null);
+    const [qrIsNew, setQrIsNew]   = useState(false);
+
+    const fetchPeers = useCallback(async (silent = false) => {
+      if (!silent) setRefreshing(true);
+      try {
+        const data = await api.get('peers');
+        setPeers(data);
+      } catch (e) {
+        if (!silent) toast.err(e.message || 'Failed to load peers');
+        if (peers === null) setPeers([]);
+      } finally {
+        if (!silent) setRefreshing(false);
+      }
+    }, [api, peers, toast]);
+
+    // Initial load + 30s auto-refresh
+    useEffect(() => {
+      fetchPeers();
+      const interval = setInterval(() => fetchPeers(true), 30000);
+      return () => clearInterval(interval);
+    }, [fetchPeers]);
+
     useEffect(() => {
       injectStyles();
       return removeStyles;
     }, []);
 
+    const handleAdded = (name) => {
+      setQrTarget(name);
+      setQrIsNew(true);
+      fetchPeers(true);
+      toast.ok('Peer "' + name + '" added successfully');
+    };
+
+    const handleImportDone = (name) => {
+      fetchPeers(true);
+      toast.ok('Peer "' + name + '" imported successfully');
+    };
+
     return html`
-      <div class="page">
-        <div class="page-header">
+      <div class="page" style=${{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', padding: '24px' }}>
+        <div class="page-header" style=${{ flexShrink: 0, marginBottom: 16 }}>
           <div>
             <h1 class="page-title">WireGuard VPN</h1>
             <p class="page-desc">Peer management & key distribution</p>
           </div>
         </div>
-        <${ServerCard} api=${api} />
-        <${SetupGuide} />
-        <${PeerList} api=${api} />
+
+        <div class="split-view" style=${{ flex: 1, minHeight: 0 }}>
+          <${CreatePeerPanel} api=${api} onAdded=${handleAdded} onImportDone=${handleImportDone} />
+          
+          <div class="split-right" style=${{ paddingLeft: 20, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' }}>
+            <${ServerCard} api=${api} />
+            <${SetupGuide} />
+            <${PeerListTable}
+              api=${api}
+              peers=${peers}
+              refreshing=${refreshing}
+              fetchPeers=${fetchPeers}
+              toggling=${toggling}
+              setToggling=${setToggling}
+              onShowConfig=${(name) => { setQrTarget(name); setQrIsNew(false); }}
+            />
+          </div>
+        </div>
+
+        ${qrTarget && html`
+          <${QRModal} name=${qrTarget} api=${api} isNew=${qrIsNew} onClose=${() => { setQrTarget(null); setQrIsNew(false); }} />
+        `}
       </div>
     `;
   }
