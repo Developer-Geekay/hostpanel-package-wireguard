@@ -9,7 +9,7 @@
   'use strict';
 
   const sdk = window.__hpkg_sdk;
-  const { html, useState, useEffect, useCallback, useRef } = sdk;
+  const { html, useState, useEffect, useCallback, useRef, useMemo } = sdk;
   const { SdkConfirmModal } = sdk.components;
   const { useApi, useToast } = sdk.hooks;
 
@@ -336,7 +336,7 @@
   // ── Peer list table ───────────────────────────────────────────────────────────
 
   function PeerListTable({ api, peers, refreshing, fetchPeers, toggling, setToggling, onShowConfig }) {
-    const { toast } = useToast();
+    const toast = useToast();
     const [deleteTarget, setDelTarget] = useState(null);
     const [renameTarget, setRenameTarget] = useState(null);
 
@@ -548,7 +548,7 @@
     const [copied,  setCopied]  = useState(false);
     const [fixing,  setFixing]  = useState(false);
     const [syncing, setSyncing] = useState(false);
-    const { toast } = useToast();
+    const toast = useToast();
 
     const handleCopyKey = () => {
       if (info?.public_key) {
@@ -606,42 +606,42 @@
       <div>
         <div class="stat-grid-4" style=${{ marginBottom: 16 }}>
           <!-- Status Card -->
-          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div class="stat-lbl">Status</div>
-            <div class="stat-val" style=${{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, marginBottom: 0 }}>
+          <div class="stat-card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div class="stat-label">Status</div>
+            <div class="stat-value" style=${{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, marginBottom: 0 }}>
               <span class=${'dot ' + (up ? 'dot-ok' : 'dot-dim')} style=${{ flexShrink: 0 }} />
               <span style=${{ textTransform: 'capitalize' }}>${loading ? 'Loading…' : up ? 'online' : 'offline'}</span>
             </div>
-            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+            <div class="stat-sub">
               ${status ? status.peers_online + ' / ' + status.peers_total + ' peers active' : '—'}
             </div>
           </div>
 
           <!-- Endpoint Card -->
-          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div class="stat-lbl">Endpoint</div>
-            <div class="stat-val" style=${{ fontSize: 16, fontFamily: 'var(--font-mono)', marginBottom: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div class="stat-card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div class="stat-label">Endpoint</div>
+            <div class="stat-value" style=${{ fontSize: 16, fontFamily: 'var(--font-mono)', marginBottom: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               ${loading ? '—' : info?.endpoint ?? '—'}
             </div>
-            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+            <div class="stat-sub">
               Port ${info?.port ?? '—'}
             </div>
           </div>
 
           <!-- Interface IP Card -->
-          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div class="stat-lbl">Interface IP</div>
-            <div class="stat-val" style=${{ fontSize: 16, fontFamily: 'var(--font-mono)', marginBottom: 0 }}>
+          <div class="stat-card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div class="stat-label">Interface IP</div>
+            <div class="stat-value" style=${{ fontSize: 16, fontFamily: 'var(--font-mono)', marginBottom: 0 }}>
               ${loading ? '—' : info?.address ?? '—'}
             </div>
-            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+            <div class="stat-sub">
               IPv4 Tunnel
             </div>
           </div>
 
           <!-- Public Key Card -->
-          <div class="card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
-            <div class="stat-lbl" style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div class="stat-card" style=${{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
+            <div class="stat-label" style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Public Key</span>
               ${info?.public_key && html`
                 <button class="wg-copy-btn" onClick=${handleCopyKey} title="Copy public key">
@@ -649,10 +649,10 @@
                 </button>
               `}
             </div>
-            <div class="stat-val mono" style=${{ fontSize: 12, wordBreak: 'break-all', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0 }} title=${info?.public_key}>
+            <div class="stat-value mono" style=${{ fontSize: 12, wordBreak: 'break-all', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0 }} title=${info?.public_key}>
               ${loading ? '—' : info?.public_key ?? '—'}
             </div>
-            <div style=${{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+            <div class="stat-sub">
               Server identity
             </div>
           </div>
@@ -683,13 +683,29 @@
   // ── Root app ──────────────────────────────────────────────────────────────────
 
   function WireGuardApp({ api }) {
-    const { toast } = useToast();
+    const toast = useToast();
     const [peers, setPeers]           = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [toggling, setToggling]     = useState(null);
+    const [selectedPeerName, setSelectedPeerName] = useState(null);
+    const [addingNew, setAddingNew] = useState(false);
+    const [search, setSearch] = useState('');
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [renameTarget, setRenameTarget] = useState(null);
+    const [formName, setFormName] = useState('');
+    const [formIp, setFormIp] = useState('');
+    const [formBusy, setFormBusy] = useState(false);
+    const [formErr, setFormErr] = useState('');
 
     const [qrTarget, setQrTarget] = useState(null);
     const [qrIsNew, setQrIsNew]   = useState(false);
+
+    const { data: status, loading: statusLoading, refetch: refetchStatus } = useApi(() => api.get('server/status'), []);
+    const { data: info } = useApi(() => api.get('server/info'), []);
+
+    const selectedPeer = useMemo(() => {
+      return (peers || []).find(p => p.name === selectedPeerName) || null;
+    }, [peers, selectedPeerName]);
 
     const fetchPeers = useCallback(async (silent = false) => {
       if (!silent) setRefreshing(true);
@@ -702,9 +718,8 @@
       } finally {
         if (!silent) setRefreshing(false);
       }
-    }, [api, peers, toast]);
+    }, [api]);
 
-    // Initial load + 30s auto-refresh
     useEffect(() => {
       fetchPeers();
       const interval = setInterval(() => fetchPeers(true), 30000);
@@ -716,48 +731,282 @@
       return removeStyles;
     }, []);
 
-    const handleAdded = (name) => {
-      setQrTarget(name);
-      setQrIsNew(true);
-      fetchPeers(true);
-      toast.ok('Peer "' + name + '" added successfully');
+    const handleAddSubmit = async (e) => {
+      e.preventDefault();
+      if (!formName.trim()) return;
+      setFormBusy(true); setFormErr('');
+      try {
+        const body = { name: formName.trim() };
+        if (formIp.trim()) body.allowed_ips = formIp.trim();
+        await api.post('peers', body);
+        setQrTarget(formName.trim()); setQrIsNew(true);
+        setAddingNew(false); setFormName(''); setFormIp('');
+        fetchPeers(true);
+        toast.ok('Peer "' + formName.trim() + '" added');
+      } catch (err) {
+        setFormErr(err.message || 'Failed to add peer');
+      } finally {
+        setFormBusy(false);
+      }
     };
 
-    const handleImportDone = (name) => {
-      fetchPeers(true);
-      toast.ok('Peer "' + name + '" imported successfully');
+    const handleDelete = async (name) => {
+      try {
+        await api.delete('peers/' + encodeURIComponent(name));
+        setDeleteTarget(null); setSelectedPeerName(null);
+        fetchPeers(true);
+        toast.ok('Peer "' + name + '" removed');
+      } catch (e) { toast.err(e.message || 'Failed to remove peer'); }
+    };
+
+    const handleRename = async (newName) => {
+      setRenameTarget(null); fetchPeers(true);
+      toast.ok('Renamed to "' + newName + '"');
+    };
+
+    const handleToggle = async (name, enabled) => {
+      setToggling(name);
+      try {
+        await api.post('peers/' + encodeURIComponent(name) + '/toggle', { enabled });
+        fetchPeers(true);
+        toast.ok(enabled ? 'Peer "' + name + '" enabled' : 'Peer "' + name + '" disabled');
+      } catch (e) { toast.err(e.message || 'Toggle failed'); }
+      finally { setToggling(null); }
+    };
+
+    const up = status?.up;
+    const filteredPeers = (peers || []).filter(p =>
+      !search.trim() || p.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    const getPeerDot = (peer) => {
+      if (!peer.enabled) return { color: '#6b7280', shadow: 'none', label: 'disabled', chipClass: 'chip-gray' };
+      const online = isOnline(peer);
+      const idle = peer.last_handshake && peer.last_handshake !== '0' && !online;
+      if (online) return { color: '#22c55e', shadow: '0 0 6px #22c55e88', label: 'active', chipClass: 'chip-green' };
+      if (idle) return { color: '#f59e0b', shadow: '0 0 6px #f59e0b44', label: 'idle', chipClass: 'chip-amber' };
+      return { color: '#6b7280', shadow: 'none', label: 'never', chipClass: 'chip-gray' };
     };
 
     return html`
       <div class="page" style=${{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', padding: '24px' }}>
-        <div class="page-header" style=${{ flexShrink: 0, marginBottom: 16 }}>
+        
+        <div class="page-header" style=${{ flexShrink: 0, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 class="page-title">WireGuard VPN</h1>
-            <p class="page-desc">Peer management & key distribution</p>
+            <p class="page-desc">${info?.interface || 'wg0'} · ${info?.address || '—'} · ${(peers || []).length} peers</p>
+          </div>
+          <div style=${{ display: 'flex', gap: 8 }}>
+            <button class="btn btn-primary btn-sm" onClick=${() => { setAddingNew(true); setSelectedPeerName(null); }}>
+              + Add Peer
+            </button>
+          </div>
+        </div>
+
+        <!-- Interface Status Bar -->
+        <div class="card" style=${{ padding: '10px 16px', marginBottom: 14, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+          <div style=${{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style=${{ width: 7, height: 7, borderRadius: '50%', background: up ? '#22c55e' : '#6b7280', boxShadow: up ? '0 0 6px #22c55e88' : 'none' }}></div>
+            <span class="mono" style=${{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>${info?.interface || 'wg0'}</span>
+            <span style=${{ fontSize: 12, color: 'var(--text-3)' }}>${statusLoading ? '…' : up ? 'running' : 'offline'}</span>
+          </div>
+          <div style=${{ color: 'var(--border)', userSelect: 'none' }}>|</div>
+          <div style=${{ fontSize: 12, color: 'var(--text-3)' }}>Port <span class="mono" style=${{ color: 'var(--text-2)' }}>${info?.port || '—'}</span></div>
+          <div style=${{ color: 'var(--border)', userSelect: 'none' }}>|</div>
+          <div style=${{ fontSize: 12, color: 'var(--text-3)' }}>Subnet <span class="mono" style=${{ color: 'var(--text-2)' }}>${info?.address || '—'}</span></div>
+          <div style=${{ color: 'var(--border)', userSelect: 'none' }}>|</div>
+          <div style=${{ fontSize: 12, color: 'var(--text-3)' }}>
+            ↑ ${formatBytes((peers || []).reduce((a, p) => a + (p.transfer_tx || 0), 0))}
+            &nbsp;↓ ${formatBytes((peers || []).reduce((a, p) => a + (p.transfer_rx || 0), 0))}
+          </div>
+          <div style=${{ marginLeft: 'auto' }}>
+            <button class="btn btn-ghost btn-xs" onClick=${() => fetchPeers()} disabled=${refreshing}>
+              ${refreshing ? '…' : '⟳'} Refresh
+            </button>
           </div>
         </div>
 
         <div class="split-view" style=${{ flex: 1, minHeight: 0 }}>
-          <${CreatePeerPanel} api=${api} onAdded=${handleAdded} onImportDone=${handleImportDone} />
           
-          <div class="split-right" style=${{ paddingLeft: 20, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' }}>
-            <${ServerCard} api=${api} />
-            <${SetupGuide} />
-            <${PeerListTable}
-              api=${api}
-              peers=${peers}
-              refreshing=${refreshing}
-              fetchPeers=${fetchPeers}
-              toggling=${toggling}
-              setToggling=${setToggling}
-              onShowConfig=${(name) => { setQrTarget(name); setQrIsNew(false); }}
-            />
+          <!-- Left Panel: Peer List -->
+          <div class="split-left" style=${{ width: 270, display: 'flex', flexDirection: 'column' }}>
+            <div style=${{ padding: '0 12px 8px' }}>
+              <input
+                class="search-input"
+                type="text"
+                placeholder="Search peers…"
+                value=${search}
+                onInput=${e => setSearch(e.target.value)}
+                style=${{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div class="split-scroll" style=${{ flex: 1, overflowY: 'auto' }}>
+              ${peers === null
+                ? html`<div style=${{ color: 'var(--text-3)', padding: 20, textAlign: 'center', fontSize: 12.5 }}>Loading…</div>`
+                : filteredPeers.length === 0
+                ? html`
+                    <div class="empty" style=${{ padding: '32px 16px' }}>
+                      <div class="empty-icon">🔒</div>
+                      <div class="empty-title">No peers</div>
+                      <div class="empty-desc" style=${{ fontSize: 11 }}>Click "+ Add Peer" to connect a device.</div>
+                    </div>`
+                : filteredPeers.map(peer => {
+                    const dot = getPeerDot(peer);
+                    const isSelected = selectedPeerName === peer.name;
+                    return html`
+                      <div
+                        key=${peer.name}
+                        class=${'list-item ' + (isSelected ? 'sel' : '')}
+                        onClick=${() => { setSelectedPeerName(peer.name); setAddingNew(false); }}
+                        style=${{ opacity: peer.enabled ? 1 : 0.6 }}
+                      >
+                        <div style=${{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+                          <div style=${{
+                            width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                            background: dot.color, boxShadow: dot.shadow,
+                          }}></div>
+                          <div style=${{ flex: 1, minWidth: 0 }}>
+                            <div class="li-name" style=${{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>${peer.name}</div>
+                            <div class="li-sub" style=${{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              ${peer.allowed_ips || '—'} · ${formatHandshake(peer.last_handshake)}
+                            </div>
+                          </div>
+                          <span class=${'chip ' + dot.chipClass} style=${{ fontSize: 10 }}>${dot.label}</span>
+                        </div>
+                      </div>`;
+                  })}
+            </div>
+          </div>
+
+          <!-- Right Panel -->
+          <div class="split-right" style=${{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            ${addingNew ? html`
+              <div class="animate-fade-in" style=${{ flex: 1, overflow: 'auto', padding: 24 }}>
+                <div style=${{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <div>
+                    <div style=${{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>New Peer</div>
+                    <div style=${{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Key pair auto-generated on the server</div>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" onClick=${() => setAddingNew(false)}>✕</button>
+                </div>
+                <form onSubmit=${handleAddSubmit} style=${{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 480 }}>
+                  <div>
+                    <label style=${{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: 6 }}>Peer Name</label>
+                    <input class="search-input" style=${{ width: '100%', boxSizing: 'border-box' }} placeholder="e.g. phone-ios" value=${formName} onInput=${e => setFormName(e.target.value)} required />
+                  </div>
+                  <div>
+                    <label style=${{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: 6 }}>Assigned IP (optional)</label>
+                    <input class="search-input" style=${{ width: '100%', boxSizing: 'border-box' }} placeholder="e.g. 10.8.0.2/32 — leave empty for auto" value=${formIp} onInput=${e => setFormIp(e.target.value)} />
+                  </div>
+                  ${formErr && html`<div style=${{ color: 'var(--err)', fontSize: 12 }}>${formErr}</div>`}
+                  <div style=${{ display: 'flex', gap: 10 }}>
+                    <button type="submit" class="btn btn-primary btn-sm" disabled=${formBusy || !formName.trim()}>
+                      ${formBusy ? 'Adding…' : 'Add Peer'}
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onClick=${() => setAddingNew(false)}>Cancel</button>
+                  </div>
+                </form>
+              </div>
+
+            ` : selectedPeer ? html`
+              <div class="animate-fade-in" style=${{ flex: 1, overflow: 'auto', padding: 24 }}>
+                ${(() => {
+                  const dot = getPeerDot(selectedPeer);
+                  return html`
+                    <div style=${{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
+                      <div>
+                        <div style=${{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style=${{ width: 8, height: 8, borderRadius: '50%', background: dot.color, boxShadow: dot.shadow }}></div>
+                          <span style=${{ fontSize: 17, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.4px' }}>${selectedPeer.name}</span>
+                          <span class=${'chip ' + dot.chipClass}>${dot.label}</span>
+                        </div>
+                        <div style=${{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, marginLeft: 18 }}>
+                          ${selectedPeer.allowed_ips || '—'} · Last handshake: ${formatHandshake(selectedPeer.last_handshake)}
+                        </div>
+                      </div>
+                      <div style=${{ display: 'flex', gap: 6 }}>
+                        ${!selectedPeer.imported && html`
+                          <button class="btn btn-outline btn-sm" onClick=${() => { setQrTarget(selectedPeer.name); setQrIsNew(false); }}>
+                            🔲 Show QR
+                          </button>`}
+                        <button class="btn btn-danger btn-sm" onClick=${() => setDeleteTarget(selectedPeer.name)}>🗑 Revoke</button>
+                      </div>
+                    </div>`;
+                })()}
+
+                <div style=${{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+                  <div class="stat-card">
+                    <div class="stat-label">Transfer ↑</div>
+                    <div class="stat-value">${formatBytes(selectedPeer.transfer_tx)}</div>
+                    <div class="stat-sub">uploaded</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">Transfer ↓</div>
+                    <div class="stat-value">${formatBytes(selectedPeer.transfer_rx)}</div>
+                    <div class="stat-sub">downloaded</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">Last Handshake</div>
+                    <div class="stat-value" style=${{ fontSize: 18 }}>${formatHandshake(selectedPeer.last_handshake)}</div>
+                    <div class="stat-sub">${isOnline(selectedPeer) ? 'active now' : 'idle'}</div>
+                  </div>
+                </div>
+
+                <div class="card" style=${{ padding: 16, marginBottom: 14 }}>
+                  <div style=${{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 12 }}>Peer Details</div>
+                  <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                    ${[
+                      ['Public Key', selectedPeer.public_key || '—', true],
+                      ['Endpoint', selectedPeer.endpoint || 'n/a', true],
+                      ['Allowed IPs', selectedPeer.allowed_ips || '—', true],
+                      ['Keepalive', selectedPeer.persistent_keepalive ? selectedPeer.persistent_keepalive + 's' : 'off', false],
+                      ['Type', selectedPeer.imported ? 'Imported' : 'Server-generated', false],
+                      ['Enabled', selectedPeer.enabled ? 'Yes' : 'No', false],
+                    ].map(([k, v, mono], i) => html`
+                      <div key=${k} style=${{ display: 'flex', justifyContent: 'space-between', padding: '8px ' + (i % 2 === 1 ? '0 8px 24px' : '0'), borderBottom: i < 4 ? '1px solid var(--border)' : 'none', gap: 8 }}>
+                        <span style=${{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>${k}</span>
+                        <span style=${{ fontSize: 12, color: 'var(--text-2)', fontFamily: mono ? 'var(--font-mono)' : 'inherit', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>${v}</span>
+                      </div>`)}
+                  </div>
+                </div>
+
+                <div style=${{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    class="btn btn-outline btn-sm"
+                    onClick=${() => handleToggle(selectedPeer.name, !selectedPeer.enabled)}
+                    disabled=${toggling === selectedPeer.name}
+                  >${toggling === selectedPeer.name ? '…' : selectedPeer.enabled ? '⏸ Disable' : '▶ Enable'}</button>
+                  <button class="btn btn-ghost btn-sm" onClick=${() => setRenameTarget(selectedPeer.name)}>✎ Rename</button>
+                </div>
+              </div>
+
+            ` : html`
+              <div class="animate-fade-in" style=${{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
+                <${ServerCard} api=${api} />
+                <${SetupGuide} />
+              </div>`}
           </div>
         </div>
 
         ${qrTarget && html`
           <${QRModal} name=${qrTarget} api=${api} isNew=${qrIsNew} onClose=${() => { setQrTarget(null); setQrIsNew(false); }} />
         `}
+        ${deleteTarget && html`
+          <${SdkConfirmModal}
+            open=${true}
+            title="Revoke Peer"
+            message=${'Remove peer "' + deleteTarget + '"? VPN access is revoked immediately.'}
+            danger=${true}
+            onClose=${() => setDeleteTarget(null)}
+            onConfirm=${() => handleDelete(deleteTarget)}
+          />`}
+        ${renameTarget && html`
+          <${RenameModal}
+            name=${renameTarget}
+            api=${api}
+            onClose=${() => setRenameTarget(null)}
+            onDone=${handleRename}
+          />`}
       </div>
     `;
   }
