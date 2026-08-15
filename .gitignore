@@ -3,3 +3,22 @@ __pycache__/
 *.egg-info/
 *.zip
 frontend/node_modules/
+
+# ── Secrets & local state — never commit ─────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+*.db
+*.sqlite
+*.sqlite3
+secrets.*
+credentials.*
+# AI session transcripts may contain pasted credentials
+*-conversation-*.txt
+2026-*.txt
